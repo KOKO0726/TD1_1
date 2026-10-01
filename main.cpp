@@ -1,6 +1,6 @@
 #include <Novice.h>
 
-const char kWindowTitle[] = "LC1D_12_タカハシ_コウノスケ";
+const char kWindowTitle[] = "LC1D_12_タカハシ";
 
 struct Vector2
 {
