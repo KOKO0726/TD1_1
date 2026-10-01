@@ -4,21 +4,18 @@ const char kWindowTitle[] = "LC1D_12_タカハシ";
 
 struct Vector2
 {
-	float x = 0.0f;
-	float y = 0.0f;
+	float posX = 0.0f;
+	float posY = 0.0f;
 };
 struct Box
 {
 	Vector2 worldLeftTop{};
 	Vector2 size{};
+	Vector2 position;
+	Vector2 velocity;
+	Vector2 acceleration;
+	float radius;
 	unsigned int color = WHITE;
-};
-
-struct Line
-{
-	Vector2 strat{};
-	Vector2 end{};
-
 };
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -38,6 +35,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kStageWidth = 1280.0f * 4.0f;
 	const float kMaxScroll = kStageWidth - 1280.0f;
 
+	float playerVelocityY = 0.0f;
+	const float kGravity = 0.8f;
+	const float kJumpPower = 15.0f;
+	const float kGroundY = 560.0f;
+	bool isJumping = false;
+
 	int backgroundTexture[4];
 	backgroundTexture[0] = Novice::LoadTexture("./Resources/images/bg1.png");
 	backgroundTexture[1] = Novice::LoadTexture("./Resources/images/bg2.png");
@@ -47,8 +50,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Box backGrounds[4]{};
 	for (int i = 0; i < 4; i++)
 	{
-		backGrounds[i].worldLeftTop.x = 0.0f + 1280 * i;
-		backGrounds[i].worldLeftTop.y = 0.0f;
+		backGrounds[i].worldLeftTop.posX = 0.0f + 1280 * i;
+		backGrounds[i].worldLeftTop.posY = 0.0f;
 		backGrounds[i].size = { 1280.0f,720.f };
 	}
 
@@ -69,37 +72,52 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-		//プレイヤー移動処理
+	//プレイヤー移動処理
 		if (keys[DIK_A])
 		{
-			player.worldLeftTop.x -= kMoveSpeed;
+			player.worldLeftTop.posX -= kMoveSpeed;
 		}
+
 		if (keys[DIK_D])
 		{
-			player.worldLeftTop.x += kMoveSpeed;
+			player.worldLeftTop.posX += kMoveSpeed;
 		}
 
-		if (keys[DIK_LEFT])
+		//ジャンプ
+		if (keys[DIK_SPACE] && !isJumping)
 		{
-			scrollStartPositionX -= kMoveSpeed;
+			playerVelocityY = -kJumpPower;
+			isJumping = true;
 		}
-		if (keys[DIK_RIGHT])
+
+		//重力
+		if (isJumping)
 		{
-			scrollStartPositionX += kMoveSpeed;
+			playerVelocityY += kGravity;
+			player.worldLeftTop.posY += playerVelocityY;
 		}
+
+		//地面判定
+		if (player.worldLeftTop.posY >= kGroundY)
+		{
+			player.worldLeftTop.posY = kGroundY;
+			playerVelocityY = 0.0f;
+			isJumping = false;
+		}
+
 		//壁判定
-		if (player.worldLeftTop.x < 0.0f)
+		if (player.worldLeftTop.posX < 0.0f)
 		{
-			player.worldLeftTop.x = 0.0f;
+			player.worldLeftTop.posX = 0.0f;
 		}
 
-		if (player.worldLeftTop.x > kStageWidth - player.size.x)
+		if (player.worldLeftTop.posX > kStageWidth - player.size.posX)
 		{
-			player.worldLeftTop.x = kStageWidth - player.size.x;
+			player.worldLeftTop.posX = kStageWidth - player.size.posX;
 		}
 
 		//スクロール処理
-		scrollValue = player.worldLeftTop.x + player.size.x - scrollStartPositionX;
+		scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
 
 		if (scrollValue < 0.0f)
 		{
@@ -123,10 +141,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{
 			//スクロール値の計算
 			const float kBackGroudScreenLeftTopX =
-				backGrounds[i].worldLeftTop.x - scrollValue;
+				backGrounds[i].worldLeftTop.posX - scrollValue;
 			Novice::DrawSprite(
 				static_cast<int>(kBackGroudScreenLeftTopX),
-				static_cast<int>(backGrounds[i].worldLeftTop.y),
+				static_cast<int>(backGrounds[i].worldLeftTop.posY),
 				backgroundTexture[i],
 				1.0f,
 				1.0f,
@@ -136,28 +154,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 		//プレイヤー描画処理
 		Novice::DrawBox(
-			static_cast<int>(player.worldLeftTop.x - scrollValue),
-			static_cast<int>(player.worldLeftTop.y),
-			static_cast<int>(player.size.x),
-			static_cast<int>(player.size.y),
+			static_cast<int>(player.worldLeftTop.posX - scrollValue),
+			static_cast<int>(player.worldLeftTop.posY),
+			static_cast<int>(player.size.posX),
+			static_cast<int>(player.size.posY),
 			0.0f,
 			static_cast<int>(player.color),
 			kFillModeSolid
-		);
-
-		Novice::DrawLine(
-			static_cast<int>(scrollStartPositionX),
-			0,
-			static_cast<int>(scrollStartPositionX),
-			800,
-			RED
 		);
 
 		Novice::ScreenPrintf(20, 20, "WASD: Move Player on the enemy");
 		Novice::ScreenPrintf(20, 40, "Arrow Keys: Move Scroll Start Line");
 		Novice::ScreenPrintf(20, 100, "Scroll X (on World Axis):%f", scrollValue);
 		Novice::ScreenPrintf(20, 120, "Scroll Start Line(on Screen Axis): 800");
-		Novice::ScreenPrintf(20, 140, "player.pos.x:%f", player.worldLeftTop.x);
+		Novice::ScreenPrintf(20, 140, "player.pos.x:%f", player.worldLeftTop.posX);
 
 		///
 		/// ↑描画処理ここまで
