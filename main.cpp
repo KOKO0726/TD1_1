@@ -153,7 +153,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			RED
 		);
 
-		Novice::ScreenPrintf(20, 20, "WASD: Move Player");
+		Novice::ScreenPrintf(20, 20, "WASD: Move Player on the enemy");
 		Novice::ScreenPrintf(20, 40, "Arrow Keys: Move Scroll Start Line");
 		Novice::ScreenPrintf(20, 100, "Scroll X (on World Axis):%f", scrollValue);
 		Novice::ScreenPrintf(20, 120, "Scroll Start Line(on Screen Axis): 800");
