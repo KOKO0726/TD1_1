@@ -62,6 +62,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		backGrounds[i].size = { 1280.0f,720.f };
 	}
 	//==========================================
+	//小物画像
+	//==========================================
+	int trampoline = 0; //トランポリン
+	trampoline = Novice::LoadTexture("./Resources/images/trampoline.png");
+
+	int coin = 0; //コイン
+	coin = Novice::LoadTexture("./Resources/images/coin.png");
+	//==========================================
+	//小物用画像
+	//==========================================
+	///トランポリン変数
+	const int kTrampolineWidth = 25; //横のトランポリンのサイズ
+	const int kTrampolineHeight = 25; //縦のトランポリンのサイズ
+
+	const int kTrampolineSize = 32; //トランポリンのタイルサイズ
+
+	///コイン変数
+	const int kCoinWidth = 25; //横コインのサイズ
+	const int kCoinHeight = 25; //縦のコインサイズ
+
+	const int kCoinSize = 32; //コインのタイルサイズ
+	//==========================================
 	//スクロール値
 	//==========================================
 	float scrollValue = 0.0f;
