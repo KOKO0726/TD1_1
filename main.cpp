@@ -60,13 +60,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//==========================================
 	//プレイヤー画像
 	//==========================================
-	int playerTexture = Novice::LoadTexture("./Resources/images/sha.png");
+	int playerTexture = Novice::LoadTexture("./Resources/images/pengin2.png");
 	//==========================================
 	//背景画像
 	//==========================================
 	int backgroundTexture[4];
-	backgroundTexture[0] = Novice::LoadTexture("./Resources/images/bg1.png");
-	backgroundTexture[1] = Novice::LoadTexture("./Resources/images/bg2.png");
+	backgroundTexture[0] = Novice::LoadTexture("./Resources/images/iceBackGround.png");
+	backgroundTexture[1] = Novice::LoadTexture("./Resources/images/iceBackGround.png");
 	backgroundTexture[2] = Novice::LoadTexture("./Resources/images/bg3.png");
 	backgroundTexture[3] = Novice::LoadTexture("./Resources/images/bg4.png");
 	//==========================================
