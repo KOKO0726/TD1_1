@@ -77,6 +77,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	int coin = 0; //コイン
 	coin = Novice::LoadTexture("./Resources/images/coin.png");
+
+	//==========================================
+	//効果音・BGM
+	//==========================================
+	int coinSound = Novice::LoadAudio("./Resources/sound/coin.MP3");
+
+
 	//==========================================
 	// トランポリンの配置座標
 	//==========================================
@@ -258,6 +265,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 					// 取得枚数を増やす
 					coinCount++;
+					Novice::PlayAudio(coinSound, false, 0.8f);
 				}
 			}
 		}
