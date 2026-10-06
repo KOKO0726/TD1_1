@@ -120,7 +120,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const int kCoinMapWidth = 40;
 	const int kCoinMapSize = 64;
 	const float kCoinSize = 64.0f;
-	int kCoinCount = 0;
 	//コイン取得記録変数
 	int coinCount = 0;
 	//==========================================
