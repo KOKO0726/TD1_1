@@ -44,14 +44,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kGroundY = 560.0f;
 	bool isJumping = false;
 	//==========================================
-	//背景画像
-	//==========================================
-	int backgroundTexture[4];
-	backgroundTexture[0] = Novice::LoadTexture("./Resources/images/bg1.png");
-	backgroundTexture[1] = Novice::LoadTexture("./Resources/images/bg2.png");
-	backgroundTexture[2] = Novice::LoadTexture("./Resources/images/bg3.png");
-	backgroundTexture[3] = Novice::LoadTexture("./Resources/images/bg4.png");
-	//==========================================
 	//背景用変数
 	//=========================================
 	Box backGrounds[4]{};
@@ -61,6 +53,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		backGrounds[i].worldLeftTop.posY = 0.0f;
 		backGrounds[i].size = { 1280.0f,720.f };
 	}
+	//==========================================
+	//プレイヤー画像
+	//==========================================
+	int playerTexture = Novice::LoadTexture("./Resources/images/sha.png");
+	//==========================================
+	//背景画像
+	//==========================================
+	int backgroundTexture[4];
+	backgroundTexture[0] = Novice::LoadTexture("./Resources/images/bg1.png");
+	backgroundTexture[1] = Novice::LoadTexture("./Resources/images/bg2.png");
+	backgroundTexture[2] = Novice::LoadTexture("./Resources/images/bg3.png");
+	backgroundTexture[3] = Novice::LoadTexture("./Resources/images/bg4.png");
 	//==========================================
 	//小物画像
 	//==========================================
@@ -308,14 +312,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		//プレイヤー描画処理
 		//===========================
-		Novice::DrawBox(
+		Novice::DrawSprite(
 			static_cast<int>(player.worldLeftTop.posX - scrollValue),
 			static_cast<int>(player.worldLeftTop.posY),
-			static_cast<int>(player.size.posX),
-			static_cast<int>(player.size.posY),
+			playerTexture,
+			1.0f,
+			1.0f,
 			0.0f,
-			static_cast<int>(player.color),
-			kFillModeSolid
+			WHITE
 		);
 
 		///
