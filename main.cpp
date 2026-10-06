@@ -41,8 +41,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	float playerVelocityY = 0.0f;
 	const float kGravity = 0.8f;
 	const float kJumpPower = 15.0f;
-	const float kGroundY = 560.0f;
 	bool isJumping = false;
+
+	//ジャンプ回数
+	int jumpCount = 0;
+	const int kMaxJumpCount = 3;
+
 	//==========================================
 	//背景用変数
 	//=========================================
@@ -73,8 +77,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	int coin = 0; //コイン
 	coin = Novice::LoadTexture("./Resources/images/coin.png");
-
+	//==========================================
 	// トランポリンの配置座標
+	//==========================================
 	Vector2 trampolinePositions[] =
 	{
 		{500.0f, 528.0f},
@@ -82,8 +87,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{1500.0f, 528.0f},
 		{2200.0f, 528.0f},
 	};
-
+	//==========================================
 	// コインの配置座標
+	//==========================================
 	Vector2 coinPositions[] =
 	{
 		{700.0f, 500.0f},
@@ -92,27 +98,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{1300.0f, 500.0f},
 		{1800.0f, 450.0f},
 	};
-	//トランポリン
+	//==========================================
+	///トランポリン変数
+	//==========================================
 	const int kTrampolineCount =
 		sizeof(trampolinePositions) / sizeof(trampolinePositions[0]);
 	const float kTrampolineBouncePower = 25.0f;
+	const int kTrampolineWidth = 32; //横のトランポリンのサイズ
+	//==========================================
 	//コイン
+	//==========================================
 	const int kCoinCount =
 		sizeof(coinPositions) / sizeof(coinPositions[0]);
-	//==========================================
-	//小物用画像
-	//==========================================
-	///トランポリン変数
-	const int kTrampolineWidth = 32; //横のトランポリンのサイズ
-	//const int kTrampolineHeight = 25; //縦のトランポリンのサイズ
-//
-//const int kTrampolineSize = 32; //トランポリンのタイルサイズ
-//
-/////コイン変数
-//const int kCoinWidth = 25; //横コインのサイズ
-//const int kCoinHeight = 25; //縦のコインサイズ
-//
-//const int kCoinSize = 32; //コインのタイルサイズ
 	//==========================================
 	//スクロール値
 	//==========================================
@@ -121,6 +118,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//スクロール開始位置
 	//==========================================
 	float scrollStartPositionX = 800.0f;
+	//==========================================
+	//座標変数
+	//==========================================
+	const float kGroundY = 560.0f;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -146,10 +147,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		//ジャンプ
 		//===========================
-		if (keys[DIK_SPACE] && !isJumping)
+		if (preKeys[DIK_SPACE] == 0 &&
+			keys[DIK_SPACE] != 0 &&
+			jumpCount < kMaxJumpCount)
 		{
 			playerVelocityY = -kJumpPower;
 			isJumping = true;
+			jumpCount++;
 		}
 		//===========================
 		//重力
@@ -168,35 +172,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			float trampolineY = trampolinePositions[i].posY;
 
 			// トランポリンの横幅
-			float trampolineRight =
-				trampolineX + kTrampolineWidth;
+			float trampolineRight = trampolineX + kTrampolineWidth;
 
 			// プレイヤーの足
-			float playerBottom =
-				player.worldLeftTop.posY + player.size.posY;
+			float playerBottom = player.worldLeftTop.posY + player.size.posY;
 
 			// プレイヤーの右端
-			float playerRight =
-				player.worldLeftTop.posX + player.size.posX;
+			float playerRight = player.worldLeftTop.posX + player.size.posX;
 
 			// 落下中
 			if (playerVelocityY > 0.0f)
 			{
 				// X方向で重なっている
-				if (player.worldLeftTop.posX < trampolineRight &&
-					playerRight > trampolineX)
+				if (player.worldLeftTop.posX < trampolineRight &&playerRight > trampolineX)
 				{
 					// トランポリンの上に到達した
-					if (playerBottom >= trampolineY &&
-						playerBottom <= trampolineY + 20.0f)
+					if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
 					{
 						// トランポリンの上に移動
-						player.worldLeftTop.posY =
-							trampolineY - player.size.posY;
+						player.worldLeftTop.posY = trampolineY - player.size.posY;
 
 						// 大きくジャンプ
 						playerVelocityY = -kTrampolineBouncePower;
-
 						isJumping = true;
 					}
 				}
@@ -210,6 +207,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			player.worldLeftTop.posY = kGroundY;
 			playerVelocityY = 0.0f;
 			isJumping = false;
+			//ジャンプ回数リセット
+			jumpCount = 0;
 		}
 		//===========================
 		//壁判定
