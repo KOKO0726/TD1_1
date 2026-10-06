@@ -31,7 +31,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//==========================================
 	Box player{};
 	player.worldLeftTop = { 10,560, };
-	player.size = { 32.0f,32.0f };
+	player.size = { 128.0f,64.0f };
 	const float kMoveSpeed = 10.0f;
 	const float kStageWidth = 1280.0f * 4.0f;
 	const float kMaxScroll = kStageWidth - 1280.0f;
@@ -106,10 +106,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kTrampolineBouncePower = 25.0f;
 	const int kTrampolineWidth = 32; //横のトランポリンのサイズ
 	//==========================================
-	//コイン
+	//コイン変数
 	//==========================================
 	const int kCoinCount =
 		sizeof(coinPositions) / sizeof(coinPositions[0]);
+	int coinCount = 0;
+	//コイン取得記録変数
+	bool isCoinGet[kCoinCount] = {};
 	//==========================================
 	//スクロール値
 	//==========================================
@@ -140,7 +143,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//プレイヤー移動処理
 		//============================
 		player.worldLeftTop.posX += kMoveSpeed;
-		if(keys[DIK_A])
+		if (keys[DIK_A])
 		{
 			player.worldLeftTop.posX -= 30;
 		}
@@ -184,7 +187,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			if (playerVelocityY > 0.0f)
 			{
 				// X方向で重なっている
-				if (player.worldLeftTop.posX < trampolineRight &&playerRight > trampolineX)
+				if (player.worldLeftTop.posX < trampolineRight && playerRight > trampolineX)
 				{
 					// トランポリンの上に到達した
 					if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
@@ -209,6 +212,45 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			isJumping = false;
 			//ジャンプ回数リセット
 			jumpCount = 0;
+		}
+		//===========================
+		//コイン判定
+		//===========================
+		for (int i = 0; i < kCoinCount; i++)
+		{
+			//すでに取ったコインは判定しない
+			if (isCoinGet[i])
+			{
+				continue;
+			}
+
+			//コインの座標
+			float coinX = coinPositions[i].posX;
+			float coinY = coinPositions[i].posY;
+
+			//コインのサイズ
+			float coinRight = coinX + 25.0f;
+			float coinBottom = coinY + 25.0f;
+
+			//プレイヤーの右端・下端
+			float playerRight =
+				player.worldLeftTop.posX + player.size.posX;
+
+			float playerBottom =
+				player.worldLeftTop.posY + player.size.posY;
+
+			//XとYが両方重なったら取得
+			if (player.worldLeftTop.posX < coinRight &&
+				playerRight > coinX &&
+				player.worldLeftTop.posY < coinBottom &&
+				playerBottom > coinY)
+			{
+				//コイン取得
+				isCoinGet[i] = true;
+
+				//取得枚数を増やす
+				coinCount++;
+			}
 		}
 		//===========================
 		//壁判定
@@ -291,6 +333,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		for (int i = 0; i < kCoinCount; i++)
 		{
+			//取得済みなら描画しない
+			if (isCoinGet[i])
+			{
+				continue;
+			}
+
 			int screenX =
 				static_cast<int>(coinPositions[i].posX - scrollValue);
 
@@ -307,6 +355,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				WHITE
 			);
 		}
+		//===========================
+		// コイン枚数描画(デバック用)
+		//===========================
+		Novice::ScreenPrintf(
+			20,
+			20,
+			"COIN : %d",
+			coinCount
+		);
 
 		//===========================
 		//プレイヤー描画処理
