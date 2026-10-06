@@ -31,7 +31,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//==========================================
 	Box player{};
 	player.worldLeftTop = { 10,560, };
-	player.size = { 128.0f,64.0f };
+	player.size = { 128.0f,32.0f };
 	const float kMoveSpeed = 10.0f;
 	const float kStageWidth = 1280.0f * 4.0f;
 	const float kMaxScroll = kStageWidth - 1280.0f;
@@ -88,15 +88,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{2200.0f, 528.0f},
 	};
 	//==========================================
-	// コインの配置座標
+	// コインの配置座標(マップチップ)
+	// コインマップ
+	// 0 = 何もなし
+	// 1 = コイン
 	//==========================================
-	Vector2 coinPositions[] =
+	int coinMap[10][40] =
 	{
-		{700.0f, 500.0f},
-		{750.0f, 450.0f},
-		{800.0f, 400.0f},
-		{1300.0f, 500.0f},
-		{1800.0f, 450.0f},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+		{0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	};
 	//==========================================
 	///トランポリン変数
@@ -108,11 +116,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//==========================================
 	//コイン変数
 	//==========================================
-	const int kCoinCount =
-		sizeof(coinPositions) / sizeof(coinPositions[0]);
-	int coinCount = 0;
+	const int kCoinMapHeight = 10;
+	const int kCoinMapWidth = 40;
+	const int kCoinMapSize = 64;
+	const float kCoinSize = 64.0f;
+	int kCoinCount = 0;
 	//コイン取得記録変数
-	bool isCoinGet[kCoinCount] = {};
+	int coinCount = 0;
 	//==========================================
 	//スクロール値
 	//==========================================
@@ -216,40 +226,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		//コイン判定
 		//===========================
-		for (int i = 0; i < kCoinCount; i++)
+		for (int y = 0; y < kCoinMapHeight; y++)
 		{
-			//すでに取ったコインは判定しない
-			if (isCoinGet[i])
+			for (int x = 0; x < kCoinMapWidth; x++)
 			{
-				continue;
-			}
+				// 1ならコインがある
+				if (coinMap[y][x] != 1)
+				{
+					continue;
+				}
 
-			//コインの座標
-			float coinX = coinPositions[i].posX;
-			float coinY = coinPositions[i].posY;
+				// コインのワールド座標
+				float coinX = static_cast<float>(x * kCoinMapSize);
+				float coinY = static_cast<float>(y * kCoinMapSize);
 
-			//コインのサイズ
-			float coinRight = coinX + 25.0f;
-			float coinBottom = coinY + 25.0f;
+				// コインの右端・下端
+				float coinRight = coinX + kCoinSize;
+				float coinBottom = coinY + kCoinSize;
 
-			//プレイヤーの右端・下端
-			float playerRight =
-				player.worldLeftTop.posX + player.size.posX;
+				// プレイヤーの右端・下端
+				float playerRight = player.worldLeftTop.posX + player.size.posX;
 
-			float playerBottom =
-				player.worldLeftTop.posY + player.size.posY;
+				float playerBottom = player.worldLeftTop.posY + player.size.posY;
 
-			//XとYが両方重なったら取得
-			if (player.worldLeftTop.posX < coinRight &&
-				playerRight > coinX &&
-				player.worldLeftTop.posY < coinBottom &&
-				playerBottom > coinY)
-			{
-				//コイン取得
-				isCoinGet[i] = true;
+				// プレイヤーとコインが重なった
+				if (player.worldLeftTop.posX < coinRight &&
+					playerRight > coinX &&
+					player.worldLeftTop.posY < coinBottom &&
+					playerBottom > coinY)
+				{
+					// コインを消す
+					coinMap[y][x] = 0;
 
-				//取得枚数を増やす
-				coinCount++;
+					// 取得枚数を増やす
+					coinCount++;
+				}
 			}
 		}
 		//===========================
@@ -331,29 +342,33 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		// コイン描画
 		//===========================
-		for (int i = 0; i < kCoinCount; i++)
+		for (int y = 0; y < kCoinMapHeight; y++)
 		{
-			//取得済みなら描画しない
-			if (isCoinGet[i])
+			for (int x = 0; x < kCoinMapWidth; x++)
 			{
-				continue;
+				// コインがない場所
+				if (coinMap[y][x] != 1)
+				{
+					continue;
+				}
+
+				float coinX = static_cast<float>(x * kCoinMapSize);
+				float coinY = static_cast<float>(y * kCoinMapSize);
+
+				int screenX = static_cast<int>(coinX - scrollValue);
+
+				int screenY = static_cast<int>(coinY);
+
+				Novice::DrawSprite(
+					screenX,
+					screenY,
+					coin,
+					1.0f,
+					1.0f,
+					0.0f,
+					WHITE
+				);
 			}
-
-			int screenX =
-				static_cast<int>(coinPositions[i].posX - scrollValue);
-
-			int screenY =
-				static_cast<int>(coinPositions[i].posY);
-
-			Novice::DrawSprite(
-				screenX,
-				screenY,
-				coin,
-				1.0f,
-				1.0f,
-				0.0f,
-				WHITE
-			);
 		}
 		//===========================
 		// コイン枚数描画(デバック用)
