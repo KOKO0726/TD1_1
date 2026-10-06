@@ -69,20 +69,46 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	int coin = 0; //コイン
 	coin = Novice::LoadTexture("./Resources/images/coin.png");
+
+	// トランポリンの配置座標
+	Vector2 trampolinePositions[] =
+	{
+		{500.0f, 528.0f},
+		{1000.0f, 528.0f},
+		{1500.0f, 528.0f},
+		{2200.0f, 528.0f},
+	};
+
+	// コインの配置座標
+	Vector2 coinPositions[] =
+	{
+		{700.0f, 500.0f},
+		{750.0f, 450.0f},
+		{800.0f, 400.0f},
+		{1300.0f, 500.0f},
+		{1800.0f, 450.0f},
+	};
+	//トランポリン
+	const int kTrampolineCount =
+		sizeof(trampolinePositions) / sizeof(trampolinePositions[0]);
+	const float kTrampolineBouncePower = 25.0f;
+	//コイン
+	const int kCoinCount =
+		sizeof(coinPositions) / sizeof(coinPositions[0]);
 	//==========================================
 	//小物用画像
 	//==========================================
 	///トランポリン変数
-	const int kTrampolineWidth = 25; //横のトランポリンのサイズ
-	const int kTrampolineHeight = 25; //縦のトランポリンのサイズ
-
-	const int kTrampolineSize = 32; //トランポリンのタイルサイズ
-
-	///コイン変数
-	const int kCoinWidth = 25; //横コインのサイズ
-	const int kCoinHeight = 25; //縦のコインサイズ
-
-	const int kCoinSize = 32; //コインのタイルサイズ
+	const int kTrampolineWidth = 32; //横のトランポリンのサイズ
+	//const int kTrampolineHeight = 25; //縦のトランポリンのサイズ
+//
+//const int kTrampolineSize = 32; //トランポリンのタイルサイズ
+//
+/////コイン変数
+//const int kCoinWidth = 25; //横コインのサイズ
+//const int kCoinHeight = 25; //縦のコインサイズ
+//
+//const int kCoinSize = 32; //コインのタイルサイズ
 	//==========================================
 	//スクロール値
 	//==========================================
@@ -104,11 +130,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-		
+
 		//============================
 		//プレイヤー移動処理
 		//============================
-			player.worldLeftTop.posX += kMoveSpeed;
+		player.worldLeftTop.posX += kMoveSpeed;
+		if(keys[DIK_A])
+		{
+			player.worldLeftTop.posX -= 30;
+		}
 		//===========================
 		//ジャンプ
 		//===========================
@@ -124,6 +154,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{
 			playerVelocityY += kGravity;
 			player.worldLeftTop.posY += playerVelocityY;
+		}
+		//===========================
+		//トランポリン判定
+		//===========================
+		for (int i = 0; i < kTrampolineCount; i++)
+		{
+			float trampolineX = trampolinePositions[i].posX;
+			float trampolineY = trampolinePositions[i].posY;
+
+			// トランポリンの横幅
+			float trampolineRight =
+				trampolineX + kTrampolineWidth;
+
+			// プレイヤーの足
+			float playerBottom =
+				player.worldLeftTop.posY + player.size.posY;
+
+			// プレイヤーの右端
+			float playerRight =
+				player.worldLeftTop.posX + player.size.posX;
+
+			// 落下中
+			if (playerVelocityY > 0.0f)
+			{
+				// X方向で重なっている
+				if (player.worldLeftTop.posX < trampolineRight &&
+					playerRight > trampolineX)
+				{
+					// トランポリンの上に到達した
+					if (playerBottom >= trampolineY &&
+						playerBottom <= trampolineY + 20.0f)
+					{
+						// トランポリンの上に移動
+						player.worldLeftTop.posY =
+							trampolineY - player.size.posY;
+
+						// 大きくジャンプ
+						playerVelocityY = -kTrampolineBouncePower;
+
+						isJumping = true;
+					}
+				}
+			}
 		}
 		//===========================
 		//地面判定
@@ -168,7 +241,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓描画処理ここから
 		///
-		
+
 		//============================
 		//画像描画処理
 		//============================
@@ -187,6 +260,51 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				WHITE
 			);
 		}
+
+		//===========================
+		// トランポリン描画
+		//===========================
+		for (int i = 0; i < kTrampolineCount; i++)
+		{
+			int screenX =
+				static_cast<int>(trampolinePositions[i].posX - scrollValue);
+
+			int screenY =
+				static_cast<int>(trampolinePositions[i].posY);
+
+			Novice::DrawSprite(
+				screenX,
+				screenY,
+				trampoline,
+				1.0f,
+				1.0f,
+				0.0f,
+				WHITE
+			);
+		}
+
+		//===========================
+		// コイン描画
+		//===========================
+		for (int i = 0; i < kCoinCount; i++)
+		{
+			int screenX =
+				static_cast<int>(coinPositions[i].posX - scrollValue);
+
+			int screenY =
+				static_cast<int>(coinPositions[i].posY);
+
+			Novice::DrawSprite(
+				screenX,
+				screenY,
+				coin,
+				1.0f,
+				1.0f,
+				0.0f,
+				WHITE
+			);
+		}
+
 		//===========================
 		//プレイヤー描画処理
 		//===========================
