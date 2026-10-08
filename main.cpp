@@ -89,8 +89,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//効果音・BGM
 	//==========================================
 	int coinSound = Novice::LoadAudio("./Resources/sound/coin.MP3");
-
-
+	int trampolineSound = Novice::LoadAudio("./Resources/sound/trampoline.MP3");
+	int jumpSound = Novice::LoadAudio("./Resources/sound/jump.MP3");
 	//==========================================
 	// トランポリンの配置座標
 	//==========================================
@@ -176,6 +176,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			keys[DIK_SPACE] != 0 &&
 			jumpCount < kMaxJumpCount)
 		{
+			Novice::PlayAudio(jumpSound, false, 0.8f);
 			playerVelocityY = -kJumpPower;
 			isJumping = true;
 			jumpCount++;
@@ -235,6 +236,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 						// 大きくジャンプ
 						playerVelocityY = -kTrampolineBouncePower;
+						Novice::PlayAudio(trampolineSound, false, 0.8f);
 						isJumping = true;
 					}
 				}
