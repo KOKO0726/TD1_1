@@ -1,4 +1,3 @@
-
 #include <Novice.h>
 #include <string.h>
 #include <math.h>
@@ -10,6 +9,7 @@ enum GameShene
     Title,
     Game,
     tutorial,
+    BonusStage, // 宇宙ボーナスステージ
 };
 
 struct Vector2
@@ -48,6 +48,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const float kBackgroundWidth = 1280.0f * 4.0f;
 
     //==========================================
+    // 宇宙ボーナスステージ用アニメーション変数
+    //==========================================
+    int universeFrame = 0;
+    int universeAnimationTimer = 0;
+    const int kUniverseFrameCount = 4; // 128px × 4コマの連番画像を想定
+
+    //==========================================
+    // 宇宙ボーナス遷移用変数
+    //==========================================
+    bool isTransitioningToBonus = false;
+    int bonusTransitionTimer = 0;
+    const int kMaxTransitionTime = 60; // 1秒間の暗転
+
+    //==========================================
     // ジャンプ
     //==========================================
     float playerVelocityY = 0.0f;
@@ -83,6 +97,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int playerJumpTexture =
         Novice::LoadTexture("./Resources/images/jump.png");
 
+    int universepengin = Novice::LoadTexture("./Resources/images/universepengin.png");
+
     int backgroundTexture[4];
 
     for (int i = 0; i < 4; i++)
@@ -90,6 +106,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         backgroundTexture[i] =
             Novice::LoadTexture("./Resources/images/iceBackGround.png");
     }
+
+    // 宇宙画像
+    int universeTexture = Novice::LoadTexture("./Resources/images/universe.png");
+    int universe2Texture = Novice::LoadTexture("./Resources/images/universe2.png");
 
     int titleTexture1 =
         Novice::LoadTexture("./Resources/images/penginno.png");
@@ -179,7 +199,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const int kTrampolineCount =
         sizeof(trampolinePositions) / sizeof(trampolinePositions[0]);
 
-    const float kTrampolineBouncePower = 25.0f;
+    // 宇宙まで跳べるようにバウンド力を大きめに調整
+    const float kTrampolineBouncePower = 40.0f;
     const int kTrampolineWidth = 32;
 
     const int kCoinMapHeight = 6;
@@ -573,7 +594,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //==========================================
             if (timer <= 60)
             {
-                // Noviceの色形式は 0xRRGGBBAA
                 unsigned int fadeColor =
                     static_cast<unsigned int>(fadeAlpha);
 
@@ -598,8 +618,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     alpha = 255;
                 }
 
-                // 黒色の透明度を徐々に上げる
-                // 0x00000000 → 0x000000FF
                 unsigned int fadeColor =
                     static_cast<unsigned int>(alpha);
 
@@ -618,34 +636,33 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         }
 
         //==========================================
-        // ゲーム処理（変更なし）
+        // ゲーム処理
         //==========================================
         case Game:
         {
-            ///
-            /// ↓更新処理ここから
-            ///
-
-            //============================
-            //プレイヤー移動処理
-            //============================
-            player.worldLeftTop.posX += kMoveSpeed;
-            if (keys[DIK_A])
+            if (!isTransitioningToBonus)
             {
-                player.worldLeftTop.posX -= 30;
-            }
+                //============================
+                //プレイヤー移動処理
+                //============================
+                player.worldLeftTop.posX += kMoveSpeed;
+                if (keys[DIK_A])
+                {
+                    player.worldLeftTop.posX -= 30;
+                }
 
-            //===========================
-            //ジャンプ
-            //===========================
-            if (preKeys[DIK_SPACE] == 0 &&
-                keys[DIK_SPACE] != 0 &&
-                jumpCount < kMaxJumpCount)
-            {
-                Novice::PlayAudio(jumpSound, false, 0.8f);
-                playerVelocityY = -kJumpPower;
-                isJumping = true;
-                jumpCount++;
+                //===========================
+                //ジャンプ
+                //===========================
+                if (preKeys[DIK_SPACE] == 0 &&
+                    keys[DIK_SPACE] != 0 &&
+                    jumpCount < kMaxJumpCount)
+                {
+                    Novice::PlayAudio(jumpSound, false, 0.8f);
+                    playerVelocityY = -kJumpPower;
+                    isJumping = true;
+                    jumpCount++;
+                }
             }
 
             if (isJumping)
@@ -681,34 +698,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 float trampolineX = trampolinePositions[i].posX;
                 float trampolineY = trampolinePositions[i].posY;
 
-                // トランポリンの横幅
                 float trampolineRight = trampolineX + kTrampolineWidth;
-
-                // プレイヤーの足
                 float playerBottom = player.worldLeftTop.posY + player.size.posY;
-
-                // プレイヤーの右端
                 float playerRight = player.worldLeftTop.posX + player.size.posX;
 
-                // 落下中
                 if (playerVelocityY > 0.0f)
                 {
-                    // X方向で重なっている
                     if (player.worldLeftTop.posX < trampolineRight && playerRight > trampolineX)
                     {
-                        // トランポリンの上に到達した
                         if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
                         {
-                            // トランポリンの上に移動
                             player.worldLeftTop.posY = trampolineY - player.size.posY;
-
-                            // 大きくジャンプ
                             playerVelocityY = -kTrampolineBouncePower;
                             Novice::PlayAudio(trampolineSound, false, 0.8f);
                             isJumping = true;
                         }
                     }
                 }
+            }
+
+            // 画面上外飛び出しチェック（宇宙へ遷移）
+            if (player.worldLeftTop.posY < -100.0f && !isTransitioningToBonus)
+            {
+                isTransitioningToBonus = true;
+                bonusTransitionTimer = 0;
             }
 
             //===========================
@@ -719,8 +732,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 player.worldLeftTop.posY = kGroundY;
                 playerVelocityY = 0.0f;
                 isJumping = false;
-
-                //ジャンプ回数リセット
                 jumpCount = 0;
             }
 
@@ -736,29 +747,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                         continue;
                     }
 
-                    // コインのワールド座標
                     float coinX = static_cast<float>(x * kCoinMapSize);
                     float coinY = static_cast<float>(y * kCoinMapSize);
 
-                    // コインの右端・下端
                     float coinRight = coinX + kCoinSize;
                     float coinBottom = coinY + kCoinSize;
 
-                    // プレイヤーの右端・下端
                     float playerRight = player.worldLeftTop.posX + player.size.posX;
-
                     float playerBottom = player.worldLeftTop.posY + player.size.posY;
 
-                    // プレイヤーとコインが重なった
                     if (player.worldLeftTop.posX < coinRight &&
                         playerRight > coinX &&
                         player.worldLeftTop.posY < coinBottom &&
                         playerBottom > coinY)
                     {
-                        // コインを消す
                         coinMap[y][x] = 0;
-
-                        // 取得枚数を増やす
                         coinCount++;
                         Novice::PlayAudio(coinSound, false, 0.8f);
                     }
@@ -773,20 +776,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 player.worldLeftTop.posX = 0.0f;
             }
 
-            if (player.worldLeftTop.posX >
-                kStageWidth - player.size.posX)
+            if (player.worldLeftTop.posX > kStageWidth - player.size.posX)
             {
-                player.worldLeftTop.posX =
-                    kStageWidth - player.size.posX;
+                player.worldLeftTop.posX = kStageWidth - player.size.posX;
             }
 
             //===========================
             //スクロール処理
             //===========================
-            scrollValue =
-                player.worldLeftTop.posX +
-                player.size.posX -
-                scrollStartPositionX;
+            scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
 
             if (scrollValue < 0.0f)
             {
@@ -798,22 +796,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 scrollValue = kMaxScroll;
             }
 
-            ///
-            /// ↑更新処理ここまで
-            ///
-
-            ///
-            /// ↓描画処理ここから
-            ///
-
             //============================
             //背景描画
             //============================
             for (int i = 0; i < 4; i++)
             {
                 const float kBackGroudScreenLeftTopX =
-                    backGrounds[i].worldLeftTop.posX -
-                    scrollValue;
+                    backGrounds[i].worldLeftTop.posX - scrollValue;
 
                 Novice::DrawSprite(
                     static_cast<int>(kBackGroudScreenLeftTopX),
@@ -831,14 +820,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //===========================
             for (int i = 0; i < kTrampolineCount; i++)
             {
-                int screenX =
-                    static_cast<int>(
-                        trampolinePositions[i].posX -
-                        scrollValue
-                        );
-
-                int screenY =
-                    static_cast<int>(trampolinePositions[i].posY);
+                int screenX = static_cast<int>(trampolinePositions[i].posX - scrollValue);
+                int screenY = static_cast<int>(trampolinePositions[i].posY);
 
                 Novice::DrawSprite(
                     screenX,
@@ -863,17 +846,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                         continue;
                     }
 
-                    float coinX =
-                        static_cast<float>(x * kCoinMapSize);
+                    float coinX = static_cast<float>(x * kCoinMapSize);
+                    float coinY = static_cast<float>(y * kCoinMapSize);
 
-                    float coinY =
-                        static_cast<float>(y * kCoinMapSize);
-
-                    int screenX =
-                        static_cast<int>(coinX - scrollValue);
-
-                    int screenY =
-                        static_cast<int>(coinY);
+                    int screenX = static_cast<int>(coinX - scrollValue);
+                    int screenY = static_cast<int>(coinY);
 
                     Novice::DrawSprite(
                         screenX,
@@ -903,13 +880,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             if (isJumping)
             {
                 Novice::DrawSpriteRect(
-                    static_cast<int>(
-                        player.worldLeftTop.posX -
-                        scrollValue
-                        ),
-                    static_cast<int>(
-                        player.worldLeftTop.posY
-                        ),
+                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(player.worldLeftTop.posY),
                     jumpFrame * 128,
                     0,
                     128,
@@ -924,13 +896,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             else
             {
                 Novice::DrawSprite(
-                    static_cast<int>(
-                        player.worldLeftTop.posX -
-                        scrollValue
-                        ),
-                    static_cast<int>(
-                        player.worldLeftTop.posY
-                        ),
+                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(player.worldLeftTop.posY),
                     playerTexture,
                     1.0f,
                     1.0f,
@@ -939,14 +906,156 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            ///
-            /// ↑描画処理ここまで
-            ///
+            // 宇宙ボーナスステージ遷移暗転処理
+            if (isTransitioningToBonus)
+            {
+                bonusTransitionTimer++;
+                int alpha = (bonusTransitionTimer * 255) / kMaxTransitionTime;
+                if (alpha > 255)
+                {
+                    alpha = 255;
+                }
+
+                Novice::DrawBox(
+                    0,
+                    0,
+                    1280,
+                    720,
+                    0.0f,
+                    static_cast<unsigned int>(alpha),
+                    kFillModeSolid
+                );
+
+                if (bonusTransitionTimer >= kMaxTransitionTime)
+                {
+                    scene = BonusStage;
+                    isTransitioningToBonus = false;
+                    bonusTransitionTimer = 0;
+
+                    player.worldLeftTop.posY = 200.0f; // 画面内上部に初期配置
+                    playerVelocityY = 0.0f;
+                }
+            }
+
             break;
         }
 
         //==========================================
-        // チュートリアル処理（変更なし）
+        // 宇宙ボーナスステージ（マリオ水中風操作＋連番アニメ表示）
+        //==========================================
+        case BonusStage:
+        {
+            // 1. 自動前進
+            player.worldLeftTop.posX += kMoveSpeed * 0.5f;
+
+            // 2. 水中風操作：SPACEキーを押すと水中で泳ぐようにふわっと浮上
+            if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0)
+            {
+                playerVelocityY = -6.0f; // 上向きの推進力
+                Novice::PlayAudio(jumpSound, false, 0.5f);
+            }
+
+            // 3. 水中風の緩やかな重力（ゆっくり沈む）
+            const float kSpaceGravity = 0.25f;
+            playerVelocityY += kSpaceGravity;
+
+            // 落下速度の上限を制限
+            if (playerVelocityY > 4.0f)
+            {
+                playerVelocityY = 4.0f;
+            }
+
+            player.worldLeftTop.posY += playerVelocityY;
+
+            // 画面上下の移動制限
+            if (player.worldLeftTop.posY < 0.0f)
+            {
+                player.worldLeftTop.posY = 0.0f;
+                playerVelocityY = 0.0f;
+            }
+            if (player.worldLeftTop.posY >= kGroundY)
+            {
+                player.worldLeftTop.posY = kGroundY;
+                playerVelocityY = 0.0f;
+            }
+
+            // 4. 連番アニメーション処理（コマ送り）
+            universeAnimationTimer++;
+            if (universeAnimationTimer >= 8)
+            {
+                universeAnimationTimer = 0;
+                universeFrame = (universeFrame + 1) % kUniverseFrameCount;
+            }
+
+            // 5. スクロール処理
+            scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
+            if (scrollValue < 0.0f) scrollValue = 0.0f;
+
+            // 背景2枚分の総幅 (1280 * 2 = 2560)
+            const float kLoopWidth = 2560.0f;
+
+            // スクロール値を 0〜2560 の範囲に正規化
+            float loopScroll = fmodf(scrollValue, kLoopWidth);
+
+            // 2枚の画像を交互に循環させて連続ループ処理
+            float universe1X = 0.0f - loopScroll;
+            if (universe1X <= -1280.0f) universe1X += kLoopWidth;
+
+            float universe2X = 1280.0f - loopScroll;
+            if (universe2X <= -1280.0f) universe2X += kLoopWidth;
+
+            // 宇宙背景の描画
+            if (universeTexture != -1)
+            {
+                Novice::DrawSprite(static_cast<int>(universe1X), 0, universeTexture, 1.0f, 1.0f, 0.0f, WHITE);
+            }
+            if (universe2Texture != -1)
+            {
+                Novice::DrawSprite(static_cast<int>(universe2X), 0, universe2Texture, 1.0f, 1.0f, 0.0f, WHITE);
+            }
+
+            // 6. 宇宙ペンギン描画（連番画像を切り抜いて表示）
+            if (universepengin != -1)
+            {
+                Novice::DrawSpriteRect(
+                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(player.worldLeftTop.posY),
+                    universeFrame * 128, // 切り抜き開始X位置
+                    0,                   // 切り抜き開始Y位置
+                    128,                 // 1コマの横幅
+                    128,                 // 1コマの高さ
+                    universepengin,
+                    1.0f / static_cast<float>(kUniverseFrameCount),
+                    1.0f,
+                    0.0f,
+                    WHITE
+                );
+            }
+
+            // フェードイン演出
+            if (bonusTransitionTimer < kMaxTransitionTime)
+            {
+                bonusTransitionTimer++;
+                int alpha = 255 - (bonusTransitionTimer * 255) / kMaxTransitionTime;
+                if (alpha < 0) alpha = 0;
+
+                Novice::DrawBox(
+                    0,
+                    0,
+                    1280,
+                    720,
+                    0.0f,
+                    static_cast<unsigned int>(alpha),
+                    kFillModeSolid
+                );
+            }
+
+            Novice::ScreenPrintf(20, 20, "BONUS STAGE!");
+            break;
+        }
+
+        //==========================================
+        // チュートリアル処理
         //==========================================
         case tutorial:
         {
@@ -974,7 +1083,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
             if (isJumping)
             {
-                // ジャンプアニメーション
                 jumpAnimationTimer++;
 
                 if (jumpAnimationTimer >= 10)
@@ -1006,28 +1114,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 float trampolineX = trampolinePositions[i].posX;
                 float trampolineY = trampolinePositions[i].posY;
 
-                // トランポリンの横幅
                 float trampolineRight = trampolineX + kTrampolineWidth;
-
-                // プレイヤーの足
                 float playerBottom = player.worldLeftTop.posY + player.size.posY;
-
-                // プレイヤーの右端
                 float playerRight = player.worldLeftTop.posX + player.size.posX;
 
-                // 落下中
                 if (playerVelocityY > 0.0f)
                 {
-                    // X方向で重なっている
                     if (player.worldLeftTop.posX < trampolineRight && playerRight > trampolineX)
                     {
-                        // トランポリンの上に到達した
                         if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
                         {
-                            // トランポリンの上に移動
                             player.worldLeftTop.posY = trampolineY - player.size.posY;
-
-                            // 大きくジャンプ
                             playerVelocityY = -kTrampolineBouncePower;
                             Novice::PlayAudio(trampolineSound, false, 0.8f);
                             isJumping = true;
@@ -1044,8 +1141,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 player.worldLeftTop.posY = kGroundY;
                 playerVelocityY = 0.0f;
                 isJumping = false;
-
-                //ジャンプ回数リセット
                 jumpCount = 0;
             }
 
@@ -1061,29 +1156,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                         continue;
                     }
 
-                    // コインのワールド座標
                     float coinX = static_cast<float>(x * kCoinMapSize);
                     float coinY = static_cast<float>(y * kCoinMapSize);
 
-                    // コインの右端・下端
                     float coinRight = coinX + kCoinSize;
                     float coinBottom = coinY + kCoinSize;
 
-                    // プレイヤーの右端・下端
                     float playerRight = player.worldLeftTop.posX + player.size.posX;
-
                     float playerBottom = player.worldLeftTop.posY + player.size.posY;
 
-                    // プレイヤーとコインが重なった
                     if (player.worldLeftTop.posX < coinRight &&
                         playerRight > coinX &&
                         player.worldLeftTop.posY < coinBottom &&
                         playerBottom > coinY)
                     {
-                        // コインを消す
                         coinMap[y][x] = 0;
-
-                        // 取得枚数を増やす
                         coinCount++;
                         Novice::PlayAudio(coinSound, false, 0.8f);
                     }
@@ -1095,7 +1182,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //===========================
             scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
 
-            // 画面が一周したらスクロール値を戻す
             if (scrollValue >= kBackgroundWidth)
             {
                 scrollValue -= kBackgroundWidth;
@@ -1104,19 +1190,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //============================================
             //チュートリアル画面描画
             //============================================
-
-            //============================
-            // 背景描画
-            //============================
             const float kBackgroundSetWidth = 1280.0f * 4.0f;
 
-            // 現在何セット目にいるか
             int backgroundSet =
                 static_cast<int>(
                     player.worldLeftTop.posX / kBackgroundSetWidth
                     );
 
-            // 現在のセットと次のセットを描画
             for (int set = 0; set < 2; set++)
             {
                 float currentSetX =
@@ -1145,10 +1225,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 }
             }
 
-            //===========================
-            // トランポリン描画
-            //===========================
-            // 何セット目にいるか
             int stageSet =
                 static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 
@@ -1179,9 +1255,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            //===========================
-            // コイン描画
-            //===========================
             for (int y = 0; y < kCoinMapHeight; y++)
             {
                 for (int x = 0; x < kCoinMapWidth; x++)
@@ -1195,9 +1268,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     float coinY = static_cast<float>(y * kCoinMapSize);
 
                     int screenX = static_cast<int>(coinX - player.worldLeftTop.posX + scrollStartPositionX);
-
-                    int screenY =
-                        static_cast<int>(coinY);
+                    int screenY = static_cast<int>(coinY);
 
                     Novice::DrawSprite(
                         screenX,
@@ -1211,9 +1282,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 }
             }
 
-            //===========================
-            // プレイヤー描画
-            //===========================
             if (isJumping)
             {
                 Novice::DrawSpriteRect(
@@ -1243,7 +1311,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            // コイン枚数
             Novice::ScreenPrintf(
                 20,
                 20,
@@ -1257,11 +1324,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         //==========================================
         // シーン切り替えフェードイン
         //==========================================
-        if (scene != Title && gameFadeTimer < 60)
+        if (scene != Title && gameFadeTimer < 60 && !isTransitioningToBonus && scene != BonusStage)
         {
             int alpha = 255 - gameFadeTimer * 255 / 60;
 
-            // 0xRRGGBBAA形式
             unsigned int fadeColor =
                 static_cast<unsigned int>(alpha);
 
