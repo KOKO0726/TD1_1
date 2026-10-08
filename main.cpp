@@ -9,7 +9,7 @@ enum GameShene
     Title,
     Game,
     tutorial,
-    BonusStage, // 宇宙ボーナスステージ
+    BonusStage, // ボーナスステージ
 };
 
 struct Vector2
@@ -52,14 +52,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     //==========================================
     int universeFrame = 0;
     int universeAnimationTimer = 0;
-    const int kUniverseFrameCount = 4; // 128px × 4コマの連番画像を想定
+    const int kUniverseFrameCount = 4;
 
     //==========================================
     // 宇宙ボーナス遷移用変数
     //==========================================
     bool isTransitioningToBonus = false;
     int bonusTransitionTimer = 0;
-    const int kMaxTransitionTime = 60; // 1秒間の暗転
+    const int kMaxTransitionTime = 60;
 
     //==========================================
     // ジャンプ
@@ -99,7 +99,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
     int universepengin = Novice::LoadTexture("./Resources/images/universepengin.png");
 
-    int backgroundTexture[4];
+    int backgroundTexture[4] = {};
 
     for (int i = 0; i < 4; i++)
     {
@@ -139,6 +139,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     //==========================================
     // 効果音
     //==========================================
+    int fireSound =
+        Novice::LoadAudio("./Resources/sound/fire.MP3");
+
     int coinSound =
         Novice::LoadAudio("./Resources/sound/coin.MP3");
 
@@ -932,7 +935,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     isTransitioningToBonus = false;
                     bonusTransitionTimer = 0;
 
-                    player.worldLeftTop.posY = 200.0f; // 画面内上部に初期配置
+                    player.worldLeftTop.posY = 200.0f;
                     playerVelocityY = 0.0f;
                 }
             }
@@ -941,21 +944,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         }
 
         //==========================================
-        // 宇宙ボーナスステージ（マリオ水中風操作＋連番アニメ表示）
+        // 宇宙ボーナスステージ
         //==========================================
         case BonusStage:
         {
             // 1. 自動前進
             player.worldLeftTop.posX += kMoveSpeed * 0.5f;
 
-            // 2. 水中風操作：SPACEキーを押すと水中で泳ぐようにふわっと浮上
+            // 2. 水中風操作：SPACEキーを押すと宇宙服の炎を噴射してふわっと浮上＋効果音再生
             if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0)
             {
-                playerVelocityY = -6.0f; // 上向きの推進力
-                Novice::PlayAudio(jumpSound, false, 0.5f);
+                playerVelocityY = -6.0f;
+                if (fireSound != -1)
+                {
+                    Novice::PlayAudio(fireSound, false, 0.2f);
+                }
             }
 
-            // 3. 水中風の緩やかな重力（ゆっくり沈む）
+            // 3. 水中風の緩やかな重力
             const float kSpaceGravity = 0.25f;
             playerVelocityY += kSpaceGravity;
 
