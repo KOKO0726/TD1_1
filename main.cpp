@@ -44,11 +44,14 @@ int WINAPI WinMain(
 	Box player{};
 	player.worldLeftTop = { 10, 500 };
 	player.size = { 128.0f, 32.0f };
-
 	const float kMoveSpeed = 10.0f;
+	//==========================================
+	// ステージ
+	//==========================================
 	const float kStageWidth = 1280.0f * 4.0f;
 	const float kMaxScroll = kStageWidth - 1280.0f;
-
+	// 背景4枚分の幅
+	const float kBackgroundWidth = 1280.0f * 4.0f;
 	//==========================================
 	// ジャンプ処理
 	//==========================================
@@ -81,6 +84,7 @@ int WINAPI WinMain(
 	//==========================================
 	// 画像読み込み
 	//==========================================
+	//プレイヤー画像
 	int playerTexture =
 		Novice::LoadTexture(
 			"./Resources/images/pengin2.png");
@@ -88,7 +92,7 @@ int WINAPI WinMain(
 	int playerJumpTexture =
 		Novice::LoadTexture(
 			"./Resources/images/jump.png");
-
+	//背景画像
 	int backgroundTexture[4];
 
 	backgroundTexture[0] =
@@ -152,8 +156,10 @@ int WINAPI WinMain(
 	//==========================================
 	//再生中フラグ
 	int titlePlayHandle = -1;
+	int tutorialPlayHandle = -1;
 	//BGMハンドル取得
 	const int kTitleHandle = Novice::LoadAudio("./Resources/bgm/title.MP3");
+	const int kTutorialHandle = Novice::LoadAudio("./Resources/bgm/tutorial.MP3");
 
 	titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
 	//==========================================
@@ -351,6 +357,7 @@ int WINAPI WinMain(
 				{
 					//サウンド
 					Novice::StopAudio(titlePlayHandle);
+					tutorialPlayHandle = Novice::PlayAudio(kTutorialHandle, true, 0.5f);
 					scene = tutorial;
 					gameFadeTimer = 0;
 				}
@@ -467,9 +474,10 @@ int WINAPI WinMain(
 
 			break;
 		}
+
 		//==========================================
 		//==========================================
-		// チュートリアル画面
+		// チュートリアル処理
 		//==========================================
 		//==========================================
 		case tutorial:
@@ -616,31 +624,14 @@ int WINAPI WinMain(
 			}
 
 			//===========================
-			//壁判定
-			//===========================
-			if (player.worldLeftTop.posX < 0.0f)
-			{
-				player.worldLeftTop.posX = 0.0f;
-			}
-
-			if (player.worldLeftTop.posX > kStageWidth - player.size.posX)
-			{
-				player.worldLeftTop.posX = kStageWidth - player.size.posX;
-			}
-
-			//===========================
 			//スクロール処理
 			//===========================
 			scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
 
-			if (scrollValue < 0.0f)
+			// 画面が一周したらスクロール値を戻す
+			if (scrollValue >= kBackgroundWidth)
 			{
-				scrollValue = 0.0f;
-			}
-
-			if (scrollValue > kMaxScroll)
-			{
-				scrollValue = kMaxScroll;
+				scrollValue -= kBackgroundWidth;
 			}
 
 			//============================================
@@ -650,29 +641,62 @@ int WINAPI WinMain(
 			//============================
 			// 背景描画
 			//============================
-			for (int i = 0; i < 4; i++)
-			{
-				const float kBackGroundScreenLeftTopX =
-					backGrounds[i].worldLeftTop.posX - scrollValue;
+			const float kBackgroundSetWidth = 1280.0f * 4.0f;
 
-				Novice::DrawSprite(
-					static_cast<int>(kBackGroundScreenLeftTopX),
-					static_cast<int>(backGrounds[i].worldLeftTop.posY),
-					backgroundTexture[i],
-					1.0f,
-					1.0f,
-					0.0f,
-					WHITE
-				);
+			// 現在何セット目にいるか
+			int backgroundSet =
+				static_cast<int>(
+					player.worldLeftTop.posX / kBackgroundSetWidth
+					);
+
+			// 現在のセットと次のセットを描画
+			for (int set = 0; set < 2; set++)
+			{
+				float currentSetX =
+					static_cast<float>(backgroundSet + set) *
+					kBackgroundSetWidth;
+
+				for (int i = 0; i < 4; i++)
+				{
+					float backgroundWorldX =
+						currentSetX + 1280.0f * i;
+
+					float screenX =
+						backgroundWorldX -
+						player.worldLeftTop.posX +
+						scrollStartPositionX;
+
+					Novice::DrawSprite(
+						static_cast<int>(screenX),
+						0,
+						backgroundTexture[i],
+						1.0f,
+						1.0f,
+						0.0f,
+						WHITE
+					);
+				}
 			}
 
 			//===========================
 			// トランポリン描画
 			//===========================
+			// 何セット目にいるか
+			int stageSet =
+				static_cast<int>(player.worldLeftTop.posX / kStageWidth);
+
 			for (int i = 0; i < kTrampolineCount; i++)
 			{
+				float trampolineWorldX =
+					trampolinePositions[i].posX +
+					stageSet * kStageWidth;
+
 				int screenX =
-					static_cast<int>(trampolinePositions[i].posX - scrollValue);
+					static_cast<int>(
+						trampolineWorldX -
+						player.worldLeftTop.posX +
+						scrollStartPositionX
+						);
 
 				int screenY =
 					static_cast<int>(trampolinePositions[i].posY);
@@ -700,11 +724,10 @@ int WINAPI WinMain(
 						continue;
 					}
 
-					float coinX = static_cast<float>(x * kCoinMapSize);
+					float coinX =static_cast<float>(x * kCoinMapSize) + stageSet * kStageWidth;
 					float coinY = static_cast<float>(y * kCoinMapSize);
 
-					int screenX =
-						static_cast<int>(coinX - scrollValue);
+					int screenX = static_cast<int>(coinX - player.worldLeftTop.posX + scrollStartPositionX);
 
 					int screenY =
 						static_cast<int>(coinY);
