@@ -46,7 +46,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//ジャンプ回数
 	int jumpCount = 0;
 	const int kMaxJumpCount = 3;
-
+	//==========================================
+	// ジャンプアニメーション処理変数
+	//==========================================
+	int jumpFrame = 0;
+	int jumpAnimationTimer = 0;
+	const int kJumpFrameCount = 4;
 	//==========================================
 	//背景用変数
 	//=========================================
@@ -61,6 +66,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//プレイヤー画像
 	//==========================================
 	int playerTexture = Novice::LoadTexture("./Resources/images/pengin2.png");
+	//ジャンプ画像	
+	int playerJumpTexture = Novice::LoadTexture("./Resources/images/jump.png");
 	//==========================================
 	//背景画像
 	//==========================================
@@ -172,6 +179,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			playerVelocityY = -kJumpPower;
 			isJumping = true;
 			jumpCount++;
+		}
+		if (isJumping)
+		{
+			// ジャンプアニメーション
+			jumpAnimationTimer++;
+
+			if (jumpAnimationTimer >= 10)
+			{
+				jumpAnimationTimer = 0;
+				jumpFrame++;
+
+				if (jumpFrame >= kJumpFrameCount)
+				{
+					jumpFrame = 0;
+				}
+			}
 		}
 		//===========================
 		//重力
@@ -389,16 +412,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================
 		//プレイヤー描画処理
 		//===========================
-		Novice::DrawSprite(
-			static_cast<int>(player.worldLeftTop.posX - scrollValue),
-			static_cast<int>(player.worldLeftTop.posY),
-			playerTexture,
-			1.0f,
-			1.0f,
-			0.0f,
-			WHITE
-		);
-
+		//ジャンプ画像の描画
+		if (isJumping)
+		{
+			Novice::DrawSpriteRect(
+				static_cast<int>(player.worldLeftTop.posX - scrollValue),
+				static_cast<int>(player.worldLeftTop.posY),
+				jumpFrame * 128,
+				0,
+				128,
+				128,
+				playerJumpTexture,
+				1.0f / 4.0f,
+				1.0f,
+				0.0f,
+				WHITE
+			);
+		}
+		//通常時の描画
+		else
+		{
+			Novice::DrawSprite(
+				static_cast<int>(player.worldLeftTop.posX - scrollValue),
+				static_cast<int>(player.worldLeftTop.posY),
+				playerTexture,
+				1.0f,
+				1.0f,
+				0.0f,
+				WHITE
+			);
+		}
 		///
 		/// ↑描画処理ここまで
 		///
