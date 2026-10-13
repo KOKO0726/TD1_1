@@ -47,6 +47,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const float kMaxScroll = kStageWidth - 1280.0f;
     const float kBackgroundWidth = 1280.0f * 4.0f;
 
+    // ボーナスステージ遷移前のプレイヤー座標記憶用
+    float savedPlayerX = 0.0f;
+
     //==========================================
     // 宇宙ボーナスステージ用アニメーション変数
     //==========================================
@@ -54,12 +57,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int universeAnimationTimer = 0;
     const int kUniverseFrameCount = 4;
 
+    // バッテリー用アニメーション変数（1コマ 256x256, 全6枚）
+    int batteryFrame = 0;
+    int batteryTimer = 0;
+    const int kBatteryFrameCount = 6; // 連番画像 6枚
+
     //==========================================
     // 宇宙ボーナス遷移用変数
     //==========================================
     bool isTransitioningToBonus = false;
     int bonusTransitionTimer = 0;
     const int kMaxTransitionTime = 60;
+
+    // ボーナスステージからの復帰フェードアウト用
+    bool isTransitioningFromBonus = false;
+    int bonusExitTransitionTimer = 0;
 
     //==========================================
     // ジャンプ
@@ -91,6 +103,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     //==========================================
     // 画像読み込み
     //==========================================
+    int batteryTexture =
+        Novice::LoadTexture("./Resources/images/battery.png");
+
     int playerTexture =
         Novice::LoadTexture("./Resources/images/pengin2.png");
 
@@ -194,7 +209,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1},
-        {0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     };
@@ -211,9 +226,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const int kCoinMapSize = 64;
     const float kCoinSize = 64.0f;
 
-    // ステージごとに、コインを取得したか記録する
+    // ステージごとに、コインを取得したか記録する（staticを付けてスタック警告C6262を修正）
     const int kMaxCoinStageSets = 100;
-    bool coinCollectedByStage[kMaxCoinStageSets]
+    static bool coinCollectedByStage[kMaxCoinStageSets]
         [kCoinMapHeight][kCoinMapWidth] = {};
 
     int coinCount = 0;
@@ -730,6 +745,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             {
                 isTransitioningToBonus = true;
                 bonusTransitionTimer = 0;
+
+                // 跳び上がった瞬間の位置を記憶
+                savedPlayerX = player.worldLeftTop.posX;
             }
 
             //===========================
@@ -940,6 +958,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     isTransitioningToBonus = false;
                     bonusTransitionTimer = 0;
 
+                    // ボーナスステージ用変数の初期化
+                    batteryFrame = 0;
+                    batteryTimer = 0;
+                    isTransitioningFromBonus = false;
+                    bonusExitTransitionTimer = 0;
+
                     player.worldLeftTop.posY = 200.0f;
                     playerVelocityY = 0.0f;
                 }
@@ -953,44 +977,76 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         //==========================================
         case BonusStage:
         {
-            // 1. 自動前進
-            player.worldLeftTop.posX += kMoveSpeed * 0.5f;
-
-            // 2. 水中風操作：SPACEキーを押すと宇宙服の炎を噴射してふわっと浮上＋効果音再生
-            if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0)
+            // 1. バッテリー（燃料）のアニメーション処理（3秒毎に更新）
+            if (batteryFrame < kBatteryFrameCount - 1)
             {
-                playerVelocityY = -6.0f;
-                if (fireSound != -1)
+                batteryTimer++;
+                if (batteryTimer >= 180) // 60FPS × 3秒 = 180フレーム
                 {
-                    Novice::PlayAudio(fireSound, false, 0.2f);
+                    batteryTimer = 0;
+                    batteryFrame++;
                 }
             }
 
-            // 3. 水中風の緩やかな重力
+            // 燃料切れ判定（6枚目＝インデックス5に達したか）
+            bool isOutOfFuel = (batteryFrame >= kBatteryFrameCount - 1);
+
+            // 2. 自動前進
+            player.worldLeftTop.posX += kMoveSpeed * 0.5f;
+
+            // 3. 水中風操作（燃料が残っている場合のみSPACEキーで浮上可能）
+            if (!isOutOfFuel)
+            {
+                if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0)
+                {
+                    playerVelocityY = -6.0f;
+                    if (fireSound != -1)
+                    {
+                        Novice::PlayAudio(fireSound, false, 0.2f);
+                    }
+                }
+            }
+
+            // 4. 重力処理
             const float kSpaceGravity = 0.25f;
             playerVelocityY += kSpaceGravity;
 
-            // 落下速度の上限を制限
-            if (playerVelocityY > 4.0f)
+            // 燃料切れの場合は落下スピード上限を外して加速落下させる
+            if (!isOutOfFuel)
             {
-                playerVelocityY = 4.0f;
+                if (playerVelocityY > 4.0f)
+                {
+                    playerVelocityY = 4.0f;
+                }
+            }
+            else
+            {
+                if (playerVelocityY > 12.0f)
+                {
+                    playerVelocityY = 12.0f;
+                }
             }
 
             player.worldLeftTop.posY += playerVelocityY;
 
-            // 画面上下の移動制限
+            // 天井制限（上面のみ）
             if (player.worldLeftTop.posY < 0.0f)
             {
                 player.worldLeftTop.posY = 0.0f;
                 playerVelocityY = 0.0f;
             }
-            if (player.worldLeftTop.posY >= kGroundY)
+
+            // 地面制限（燃料が残っている時だけ地上で止まる。燃料切れ時は突き抜けて落下）
+            if (!isOutOfFuel)
             {
-                player.worldLeftTop.posY = kGroundY;
-                playerVelocityY = 0.0f;
+                if (player.worldLeftTop.posY >= kGroundY)
+                {
+                    player.worldLeftTop.posY = kGroundY;
+                    playerVelocityY = 0.0f;
+                }
             }
 
-            // 4. 連番アニメーション処理（コマ送り）
+            // 5. 連番アニメーション処理（ペンギンコマ送り）
             universeAnimationTimer++;
             if (universeAnimationTimer >= 8)
             {
@@ -998,24 +1054,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 universeFrame = (universeFrame + 1) % kUniverseFrameCount;
             }
 
-            // 5. スクロール処理
+            // 6. スクロール処理
             scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
             if (scrollValue < 0.0f) scrollValue = 0.0f;
 
-            // 背景2枚分の総幅 (1280 * 2 = 2560)
             const float kLoopWidth = 2560.0f;
-
-            // スクロール値を 0〜2560 の範囲に正規化
             float loopScroll = fmodf(scrollValue, kLoopWidth);
 
-            // 2枚の画像を交互に循環させて連続ループ処理
             float universe1X = 0.0f - loopScroll;
             if (universe1X <= -1280.0f) universe1X += kLoopWidth;
 
             float universe2X = 1280.0f - loopScroll;
             if (universe2X <= -1280.0f) universe2X += kLoopWidth;
 
-            // 宇宙背景の描画
+            // 宇宙背景描画
             if (universeTexture != -1)
             {
                 Novice::DrawSprite(static_cast<int>(universe1X), 0, universeTexture, 1.0f, 1.0f, 0.0f, WHITE);
@@ -1025,16 +1077,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 Novice::DrawSprite(static_cast<int>(universe2X), 0, universe2Texture, 1.0f, 1.0f, 0.0f, WHITE);
             }
 
-            // 6. 宇宙ペンギン描画（連番画像を切り抜いて表示）
+            // 7. 宇宙ペンギン描画
             if (universepengin != -1)
             {
                 Novice::DrawSpriteRect(
                     static_cast<int>(player.worldLeftTop.posX - scrollValue),
                     static_cast<int>(player.worldLeftTop.posY),
-                    universeFrame * 128, // 切り抜き開始X位置
-                    0,                   // 切り抜き開始Y位置
-                    128,                 // 1コマの横幅
-                    128,                 // 1コマの高さ
+                    universeFrame * 128,
+                    0,
+                    128,
+                    128,
                     universepengin,
                     1.0f / static_cast<float>(kUniverseFrameCount),
                     1.0f,
@@ -1043,7 +1095,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            // フェードイン演出
+            // 8. 左上にバッテリー画像の描画（1コマ 256x256）
+            if (batteryTexture != -1)
+            {
+                const int kBatteryWidth = 256;  // 1コマの幅 (256px)
+                const int kBatteryHeight = 256; // 1コマの高さ (256px)
+                const int kBatteryImageWidth = kBatteryWidth * kBatteryFrameCount;
+
+                float scale = 0.5f; // 画面表示倍率
+
+                Novice::DrawSpriteRect(
+                    20,                           // 画面 X 座標
+                    20,                           // 画面 Y 座標
+                    batteryFrame * kBatteryWidth, // 切り抜き開始 X
+                    0,                            // 切り抜き開始 Y
+                    kBatteryWidth,                // 切り抜き幅
+                    kBatteryHeight,               // 切り抜き高さ
+                    batteryTexture,
+                    (static_cast<float>(kBatteryWidth) / static_cast<float>(kBatteryImageWidth)) * scale,
+                    1.0f * scale,
+                    0.0f,
+                    WHITE
+                );
+            }
+
+            // 9. 画面外落下＆土管風シーン切り替え判定
+            if (player.worldLeftTop.posY >= 720.0f && !isTransitioningFromBonus)
+            {
+                isTransitioningFromBonus = true;
+                bonusExitTransitionTimer = 0;
+            }
+
+            // 開始時フェードイン
             if (bonusTransitionTimer < kMaxTransitionTime)
             {
                 bonusTransitionTimer++;
@@ -1051,17 +1134,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 if (alpha < 0) alpha = 0;
 
                 Novice::DrawBox(
-                    0,
-                    0,
-                    1280,
-                    720,
+                    0, 0, 1280, 720,
                     0.0f,
                     static_cast<unsigned int>(alpha),
                     kFillModeSolid
                 );
             }
 
-            Novice::ScreenPrintf(20, 20, "BONUS STAGE!");
+            // 土管風フェードアウト（下へ画面外へ消えた時の遷移演出）
+            if (isTransitioningFromBonus)
+            {
+                bonusExitTransitionTimer++;
+                int alpha = (bonusExitTransitionTimer * 255) / 30; // 約0.5秒で暗転
+                if (alpha > 255) alpha = 255;
+
+                Novice::DrawBox(
+                    0, 0, 1280, 720,
+                    0.0f,
+                    static_cast<unsigned int>(alpha),
+                    kFillModeSolid
+                );
+
+                if (bonusExitTransitionTimer >= 30)
+                {
+                    // ゲームシーンへ復帰
+                    scene = Game;
+                    isTransitioningFromBonus = false;
+                    gameFadeTimer = 0;
+
+                    // 復帰時のプレイヤー位置・状態のリセット
+                    // ジャンプして飛び上がった場所の少し手前（200px左）に復帰
+                    player.worldLeftTop.posX = savedPlayerX - 200.0f;
+                    if (player.worldLeftTop.posX < 0.0f)
+                    {
+                        player.worldLeftTop.posX = 0.0f; // 端での安全制御
+                    }
+
+                    player.worldLeftTop.posY = kGroundY; // 地上に着地
+                    playerVelocityY = 0.0f;
+                    isJumping = false;
+                    jumpCount = 0;
+                }
+            }
+
             break;
         }
 
