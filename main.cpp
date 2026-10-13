@@ -4,22 +4,19 @@
 
 const char kWindowTitle[] = "LC1D_12_タカハシ";
 
-enum GameShene
-{
+enum GameShene {
     Title,
     Game,
     tutorial,
-    BonusStage, // ボーナスステージ
+    BonusStage
 };
 
-struct Vector2
-{
+struct Vector2 {
     float posX = 0.0f;
     float posY = 0.0f;
 };
 
-struct Box
-{
+struct Box {
     Vector2 worldLeftTop{};
     Vector2 size{};
     Vector2 position;
@@ -28,8 +25,8 @@ struct Box
     unsigned int color = WHITE;
 };
 
-int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
-{
+int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
     Novice::Initialize(kWindowTitle, 1280, 720);
 
     char keys[256] = { 0 };
@@ -39,7 +36,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     // プレイヤー
     //==========================================
     Box player{};
-    player.worldLeftTop = { 10, 500 };
+    player.worldLeftTop = { 10.0f, 500.0f };
     player.size = { 128.0f, 32.0f };
 
     const float kMoveSpeed = 10.0f;
@@ -47,29 +44,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const float kMaxScroll = kStageWidth - 1280.0f;
     const float kBackgroundWidth = 1280.0f * 4.0f;
 
-    // ボーナスステージ遷移前のプレイヤー座標記憶用
     float savedPlayerX = 0.0f;
 
     //==========================================
-    // 宇宙ボーナスステージ用アニメーション変数
+    // 宇宙ステージ
     //==========================================
     int universeFrame = 0;
     int universeAnimationTimer = 0;
     const int kUniverseFrameCount = 4;
 
-    // バッテリー用アニメーション変数）
     int batteryFrame = 0;
     int batteryTimer = 0;
     const int kBatteryFrameCount = 6;
 
-    //==========================================
-    // 宇宙ボーナス遷移用変数
-    //==========================================
     bool isTransitioningToBonus = false;
     int bonusTransitionTimer = 0;
     const int kMaxTransitionTime = 60;
 
-    // ボーナスステージからの復帰フェードアウト用
     bool isTransitioningFromBonus = false;
     int bonusExitTransitionTimer = 0;
 
@@ -89,19 +80,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const int kJumpFrameCount = 4;
 
     //==========================================
-    // 背景
-    //==========================================
-    Box backGrounds[4]{};
-
-    for (int i = 0; i < 4; i++)
-    {
-        backGrounds[i].worldLeftTop.posX = 1280.0f * i;
-        backGrounds[i].worldLeftTop.posY = 0.0f;
-        backGrounds[i].size = { 1280.0f, 720.0f };
-    }
-
-    //==========================================
-    // 画像読み込み
+    // 画像
     //==========================================
     int batteryTexture =
         Novice::LoadTexture("./Resources/images/battery.png");
@@ -112,19 +91,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int playerJumpTexture =
         Novice::LoadTexture("./Resources/images/jump.png");
 
-    int universepengin = Novice::LoadTexture("./Resources/images/universepengin.png");
+    int universepengin =
+        Novice::LoadTexture("./Resources/images/universepengin.png");
 
-    int backgroundTexture[4] = {};
+    int backgroundTexture =
+        Novice::LoadTexture("./Resources/images/iceBackGround.png");
 
-    for (int i = 0; i < 4; i++)
-    {
-        backgroundTexture[i] =
-            Novice::LoadTexture("./Resources/images/iceBackGround.png");
-    }
+    int universeTexture =
+        Novice::LoadTexture("./Resources/images/universe.png");
 
-    // 宇宙画像
-    int universeTexture = Novice::LoadTexture("./Resources/images/universe.png");
-    int universe2Texture = Novice::LoadTexture("./Resources/images/universe2.png");
+    int universe2Texture =
+        Novice::LoadTexture("./Resources/images/universe2.png");
 
     int titleTexture1 =
         Novice::LoadTexture("./Resources/images/penginno.png");
@@ -132,12 +109,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int titleTexture2 =
         Novice::LoadTexture("./Resources/images/harasuberi.png");
 
-    int menuTextures[3] =
-    {
+    int menuTextures[3] = {
         Novice::LoadTexture("./Resources/images/space.png"),
         Novice::LoadTexture("./Resources/images/tutorial.png"),
         Novice::LoadTexture("./Resources/images/credit.png")
     };
+
+    int ruleTexture =
+        Novice::LoadTexture("./Resources/images/ruleFormat.png");
 
     int selectArrowTexture =
         Novice::LoadTexture("./Resources/images/command.png");
@@ -157,6 +136,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int fireSound =
         Novice::LoadAudio("./Resources/sound/fire.MP3");
 
+    // ★fireの再生ハンドル
+    int firePlayHandle = -1;
+
     int coinSound =
         Novice::LoadAudio("./Resources/sound/coin.MP3");
 
@@ -172,9 +154,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int pushSound =
         Novice::LoadAudio("./Resources/sound/push.MP3");
 
-    // 効果音再生管理用ハンドル
-    int firePlayHandle = -1;
-
     //==========================================
     // BGM
     //==========================================
@@ -185,52 +164,59 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         Novice::LoadAudio("./Resources/bgm/tutorial.MP3");
 
     int titlePlayHandle = -1;
-    int tutorialPlayHandle = -1;
 
-    if (kTitleHandle != -1)
-    {
+    if (kTitleHandle != -1) {
         titlePlayHandle =
             Novice::PlayAudio(kTitleHandle, true, 0.5f);
     }
 
     //==========================================
-    // トランポリン配置
+    // トランポリン
     //==========================================
-    Vector2 trampolinePositions[] =
-    {
+    Vector2 trampolinePositions[] = {
         {500.0f, 500.0f},
         {1000.0f, 500.0f},
         {1500.0f, 500.0f},
-        {2200.0f, 500.0f},
-    };
-
-    //==========================================
-    // コイン配置
-    //==========================================
-    int coinMap[6][100] =
-    {
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1},
-        {0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {2200.0f, 500.0f}
     };
 
     const int kTrampolineCount =
         sizeof(trampolinePositions) / sizeof(trampolinePositions[0]);
 
-    // 宇宙まで跳べるようにバウンド力を大きめに調整
     const float kTrampolineBouncePower = 40.0f;
     const int kTrampolineWidth = 32;
+
+    //==========================================
+    // コイン
+    //==========================================
+    int coinMap[6][100] = {};
 
     const int kCoinMapHeight = 6;
     const int kCoinMapWidth = 100;
     const int kCoinMapSize = 64;
     const float kCoinSize = 64.0f;
 
-    // ステージごとに、コインを取得したか記録する
+    // コイン配置
+    const int coinPositions[][2] = {
+        {5,5}, {6,4}, {6,3}, {10,3},
+        {17,3}, {18,3}, {26,3}, {27,4},
+        {38,2}, {39,2}, {40,2},
+        {50,2}, {52,2}, {60,1}
+    };
+
+    for (int i = 0;
+        i < static_cast<int>(
+            sizeof(coinPositions) / sizeof(coinPositions[0])
+            ); i++) {
+
+        int x = coinPositions[i][0];
+        int y = coinPositions[i][1];
+
+        coinMap[y][x] = 1;
+    }
+
     const int kMaxCoinStageSets = 100;
+
     static bool coinCollectedByStage[kMaxCoinStageSets]
         [kCoinMapHeight][kCoinMapWidth] = {};
 
@@ -240,7 +226,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     // スクロール
     //==========================================
     float scrollValue = 0.0f;
-    float scrollStartPositionX = 500.0f;
+    const float scrollStartPositionX = 500.0f;
     const float kGroundY = 500.0f;
 
     //==========================================
@@ -249,20 +235,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     int scene = Title;
 
     int timer = 0;
-    int fadeAlpha = 255;
     int gameFadeTimer = 0;
-
     int selectedMenu = 0;
 
-    //==========================================
-    // タイトル決定後のフェードアウト
-    //==========================================
+    bool isRuleOpen = false;
+
     bool isTitleFading = false;
     int titleFadeTimer = 0;
     const int kTitleFadeDuration = 90;
 
     //==========================================
-    // タイトル文字
+    // タイトルアニメーション
     //==========================================
     float title1Y = -180.0f;
     float title2Y = -250.0f;
@@ -270,185 +253,182 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     float title1Velocity = 0.0f;
     float title2Velocity = 0.0f;
 
-    //==========================================
-    // タイトルペンギン
-    //==========================================
     float penguinX = -200.0f;
     float penguinY = 380.0f;
-    float penguinSpeed = 8.0f;
+    const float penguinSpeed = 8.0f;
 
     //==========================================
     // メインループ
     //==========================================
-    while (Novice::ProcessMessage() == 0)
-    {
+    while (Novice::ProcessMessage() == 0) {
+
         Novice::BeginFrame();
 
         memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
 
-        switch (scene)
-        {
-        case Title:
-        {
+        switch (scene) {
+
+            //==========================================
+            // タイトル
+            //==========================================
+        case Title: {
+
             timer++;
 
-            //==========================================
-            // タイトル開始時のフェードイン更新
-            //==========================================
-            if (timer <= 60)
-            {
-                fadeAlpha = 255 - timer * 255 / 60;
+            // タイトル1の落下
+            if (timer > 60) {
 
-                if (fadeAlpha < 0)
-                {
-                    fadeAlpha = 0;
-                }
-            }
+                if (title1Y < 20.0f ||
+                    title1Velocity != 0.0f) {
 
-            //==========================================
-            // 「ペンギンの」落下・バウンド
-            //==========================================
-            if (timer > 60)
-            {
-                if (title1Y < 20.0f || title1Velocity != 0.0f)
-                {
                     title1Velocity += 0.7f;
                     title1Y += title1Velocity;
 
-                    if (title1Y >= 20.0f)
-                    {
+                    if (title1Y >= 20.0f) {
+
                         title1Y = 20.0f;
                         title1Velocity *= -0.4f;
 
-                        if (fabsf(title1Velocity) < 1.5f)
-                        {
+                        if (fabsf(title1Velocity) < 1.5f) {
                             title1Velocity = 0.0f;
                         }
                     }
                 }
             }
 
-            //==========================================
-            // 「はらすべり」落下・バウンド
-            //==========================================
-            if (timer > 85)
-            {
-                if (title2Y < 150.0f || title2Velocity != 0.0f)
-                {
+            // タイトル2の落下
+            if (timer > 85) {
+
+                if (title2Y < 150.0f ||
+                    title2Velocity != 0.0f) {
+
                     title2Velocity += 0.7f;
                     title2Y += title2Velocity;
 
-                    if (title2Y >= 150.0f)
-                    {
+                    if (title2Y >= 150.0f) {
+
                         title2Y = 150.0f;
                         title2Velocity *= -0.4f;
 
-                        if (fabsf(title2Velocity) < 1.5f)
-                        {
+                        if (fabsf(title2Velocity) < 1.5f) {
                             title2Velocity = 0.0f;
                         }
                     }
                 }
             }
 
-            //==========================================
             // ペンギン移動
-            //==========================================
-            if (timer > 180)
-            {
+            if (timer > 180) {
+
                 penguinX += penguinSpeed;
 
-                if (penguinX > 1280.0f)
-                {
+                if (penguinX > 1280.0f) {
                     penguinX = -200.0f;
                 }
             }
 
-            if (timer > 300)
-            {
+            if (timer > 300) {
                 penguinY =
                     380.0f + sinf(timer * 0.07f) * 5.0f;
             }
 
             //==========================================
-            // メニュー操作＋効果音
+            // メニュー操作
             //==========================================
-            if (timer > 365 && !isTitleFading)
-            {
-                // 左へ移動
-                if ((preKeys[DIK_LEFT] == 0 && keys[DIK_LEFT] != 0) ||
-                    (preKeys[DIK_A] == 0 && keys[DIK_A] != 0))
-                {
-                    selectedMenu = (selectedMenu + 2) % 3;
+            if (timer > 365 && !isTitleFading) {
 
-                    if (cursorSound != -1)
-                    {
-                        Novice::PlayAudio(cursorSound, false, 0.8f);
+                if (isRuleOpen) {
+
+                    if (preKeys[DIK_SPACE] == 0 &&
+                        keys[DIK_SPACE] != 0) {
+
+                        isRuleOpen = false;
                     }
+
                 }
+                else {
 
-                // 右へ移動
-                if ((preKeys[DIK_RIGHT] == 0 && keys[DIK_RIGHT] != 0) ||
-                    (preKeys[DIK_D] == 0 && keys[DIK_D] != 0))
-                {
-                    selectedMenu = (selectedMenu + 1) % 3;
+                    // 左
+                    if ((preKeys[DIK_LEFT] == 0 &&
+                        keys[DIK_LEFT] != 0) ||
+                        (preKeys[DIK_A] == 0 &&
+                            keys[DIK_A] != 0)) {
 
-                    if (cursorSound != -1)
-                    {
-                        Novice::PlayAudio(cursorSound, false, 0.8f);
-                    }
-                }
+                        selectedMenu = (selectedMenu + 2) % 3;
 
-                // SPACEで決定
-                if (preKeys[DIK_SPACE] == 0 &&
-                    keys[DIK_SPACE] != 0)
-                {
-                    // 遷移先があるメニューだけ決定
-                    if (selectedMenu == 0 || selectedMenu == 1)
-                    {
-                        if (pushSound != -1)
-                        {
-                            Novice::PlayAudio(pushSound, false, 0.8f);
+                        if (cursorSound != -1) {
+                            Novice::PlayAudio(
+                                cursorSound, false, 0.8f
+                            );
                         }
+                    }
 
-                        isTitleFading = true;
-                        titleFadeTimer = 0;
+                    // 右
+                    if ((preKeys[DIK_RIGHT] == 0 &&
+                        keys[DIK_RIGHT] != 0) ||
+                        (preKeys[DIK_D] == 0 &&
+                            keys[DIK_D] != 0)) {
+
+                        selectedMenu = (selectedMenu + 1) % 3;
+
+                        if (cursorSound != -1) {
+                            Novice::PlayAudio(
+                                cursorSound, false, 0.8f
+                            );
+                        }
+                    }
+
+                    // 決定
+                    if (preKeys[DIK_SPACE] == 0 &&
+                        keys[DIK_SPACE] != 0) {
+
+                        if (selectedMenu == 2) {
+
+                            isRuleOpen = true;
+
+                        }
+                        else {
+
+                            if (pushSound != -1) {
+                                Novice::PlayAudio(
+                                    pushSound, false, 0.8f
+                                );
+                            }
+
+                            isTitleFading = true;
+                            titleFadeTimer = 0;
+                        }
                     }
                 }
             }
 
             //==========================================
-            // 決定後のフェードアウト更新
+            // タイトルフェードアウト
             //==========================================
-            if (isTitleFading)
-            {
+            if (isTitleFading) {
+
                 titleFadeTimer++;
 
-                if (titleFadeTimer > kTitleFadeDuration)
-                {
-                    if (titlePlayHandle != -1)
-                    {
+                if (titleFadeTimer >= kTitleFadeDuration) {
+
+                    if (titlePlayHandle != -1) {
                         Novice::StopAudio(titlePlayHandle);
+                        titlePlayHandle = -1;
                     }
 
-                    if (selectedMenu == 0)
-                    {
+                    if (selectedMenu == 0) {
                         scene = Game;
                     }
-                    else if (selectedMenu == 1)
-                    {
-                        if (kTutorialHandle != -1)
-                        {
-                            tutorialPlayHandle =
-                                Novice::PlayAudio(
-                                    kTutorialHandle,
-                                    true,
-                                    0.5f
-                                );
-                        }
+                    else if (selectedMenu == 1) {
 
                         scene = tutorial;
+
+                        if (kTutorialHandle != -1) {
+                            Novice::PlayAudio(
+                                kTutorialHandle, true, 0.5f
+                            );
+                        }
                     }
 
                     gameFadeTimer = 0;
@@ -457,45 +437,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             }
 
             //==========================================
-            // Rキーでタイトル演出を再生
-            //==========================================
-            if (!isTitleFading &&
-                preKeys[DIK_R] == 0 &&
-                keys[DIK_R] != 0)
-            {
-                timer = 0;
-                fadeAlpha = 255;
-
-                title1Y = -180.0f;
-                title2Y = -250.0f;
-
-                title1Velocity = 0.0f;
-                title2Velocity = 0.0f;
-
-                penguinX = -200.0f;
-                penguinY = 380.0f;
-                penguinSpeed = 8.0f;
-
-                selectedMenu = 0;
-            }
-
-            //==========================================
             // 背景
             //==========================================
-            if (backgroundTexture[0] != -1)
-            {
+            if (backgroundTexture != -1) {
                 Novice::DrawSprite(
                     0, 0,
-                    backgroundTexture[0],
+                    backgroundTexture,
                     1.0f, 1.0f, 0.0f, WHITE
                 );
             }
 
-            //==========================================
-            // タイトル1
-            //==========================================
-            if (timer > 60 && titleTexture1 != -1)
-            {
+            // タイトル文字
+            if (timer > 60 && titleTexture1 != -1) {
                 Novice::DrawSprite(
                     430,
                     static_cast<int>(title1Y),
@@ -504,11 +457,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            //==========================================
-            // タイトル2
-            //==========================================
-            if (timer > 85 && titleTexture2 != -1)
-            {
+            if (timer > 85 && titleTexture2 != -1) {
                 Novice::DrawSprite(
                     400,
                     static_cast<int>(title2Y),
@@ -517,11 +466,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            //==========================================
             // ペンギン
-            //==========================================
-            if (timer > 180 && playerTexture != -1)
-            {
+            if (timer > 180 && playerTexture != -1) {
                 Novice::DrawSprite(
                     static_cast<int>(penguinX),
                     static_cast<int>(penguinY),
@@ -531,26 +477,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             }
 
             //==========================================
-            // メニュー登場アニメーション
+            // メニュー
             //==========================================
-            if (timer > 300)
-            {
+            if (timer > 300) {
+
                 const int menuX[3] = { 185, 515, 845 };
                 const int menuY = 485;
 
-                for (int i = 0; i < 3; i++)
-                {
+                for (int i = 0; i < 3; i++) {
+
                     int elapsed = timer - 301 - i * 9;
 
-                    if (elapsed < 0 || menuTextures[i] == -1)
-                    {
+                    if (elapsed < 0 || menuTextures[i] == -1) {
                         continue;
                     }
 
                     float offsetY = 0.0f;
 
-                    if (elapsed < 18)
-                    {
+                    if (elapsed < 18) {
+
                         float t =
                             static_cast<float>(elapsed) / 18.0f;
 
@@ -558,21 +503,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                             1.0f - (1.0f - t) * (1.0f - t);
 
                         offsetY = 180.0f - 200.0f * eased;
+
                     }
-                    else if (elapsed < 28)
-                    {
+                    else if (elapsed < 28) {
+
                         float t =
                             static_cast<float>(elapsed - 18) / 10.0f;
 
                         offsetY = -20.0f + 20.0f * t;
-                    }
-                    else if (elapsed < 35)
-                    {
-                        float t =
-                            static_cast<float>(elapsed - 28) / 7.0f;
-
-                        offsetY =
-                            -7.0f * sinf(t * 3.14159265f);
                     }
 
                     Novice::DrawSprite(
@@ -583,9 +521,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     );
                 }
 
-                // 選択矢印
-                if (timer > 365 && selectArrowTexture != -1)
-                {
+                if (timer > 365 && selectArrowTexture != -1) {
                     Novice::DrawSprite(
                         menuX[selectedMenu] + 109,
                         menuY - 38,
@@ -595,382 +531,389 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 }
             }
 
-            //==========================================
             // PUSH SPACE
-            //==========================================
-            if (timer > 365 && pushSpaceTexture != -1)
-            {
-                if ((timer / 30) % 2 == 0)
-                {
+            if (timer > 365 && pushSpaceTexture != -1) {
+
+                if ((timer / 30) % 2 == 0) {
                     Novice::DrawSprite(
-                        500,
-                        585,
+                        500, 585,
                         pushSpaceTexture,
-                        2.0f,
-                        2.0f,
-                        0.0f,
-                        WHITE
+                        2.0f, 2.0f, 0.0f, WHITE
                     );
                 }
             }
 
-            //==========================================
-            // タイトル開始時のフェードイン
-            //==========================================
-            if (timer <= 60)
-            {
-                unsigned int fadeColor =
-                    static_cast<unsigned int>(fadeAlpha);
+            // タイトル開始フェードイン
+            if (timer <= 60) {
+
+                int alpha = 255 - timer * 255 / 60;
+
+                if (alpha < 0) {
+                    alpha = 0;
+                }
 
                 Novice::DrawBox(
                     0, 0, 1280, 720,
                     0.0f,
-                    fadeColor,
+                    static_cast<unsigned int>(alpha),
+                    kFillModeSolid
+                );
+            }
+
+            // 決定後フェードアウト
+            if (isTitleFading) {
+
+                int alpha =
+                    titleFadeTimer * 255 / kTitleFadeDuration;
+
+                if (alpha > 255) {
+                    alpha = 255;
+                }
+
+                Novice::DrawBox(
+                    0, 0, 1280, 720,
+                    0.0f,
+                    static_cast<unsigned int>(alpha),
                     kFillModeSolid
                 );
             }
 
             //==========================================
-            // 決定後のフェードアウト描画
+            // 基本操作画面
             //==========================================
-            if (isTitleFading)
-            {
-                int alpha =
-                    titleFadeTimer * 255 / kTitleFadeDuration;
+            if (isRuleOpen) {
 
-                if (alpha > 255)
-                {
-                    alpha = 255;
+                if (ruleTexture != -1) {
+                    Novice::DrawSprite(
+                        0, 0,
+                        ruleTexture,
+                        1.0f, 1.0f, 0.0f, WHITE
+                    );
                 }
 
-                unsigned int fadeColor =
-                    static_cast<unsigned int>(alpha);
+                if (playerTexture != -1) {
+                    Novice::DrawSprite(
+                        700, 150,
+                        playerTexture,
+                        1.5f, 1.5f, 0.0f, WHITE
+                    );
+                }
 
-                Novice::DrawBox(
-                    0,
-                    0,
-                    1280,
-                    720,
-                    0.0f,
-                    fadeColor,
-                    kFillModeSolid
-                );
+                if (coin != -1) {
+                    Novice::DrawSprite(
+                        870, 175,
+                        coin,
+                        1.5f, 1.5f, 0.0f, WHITE
+                    );
+                }
+
+                if (trampoline != -1) {
+                    Novice::DrawSprite(
+                        850, 400,
+                        trampoline,
+                        1.5f, 1.5f, 0.0f, WHITE
+                    );
+                }
+
+                if (playerTexture != -1) {
+                    Novice::DrawSprite(
+                        850, 340,
+                        playerTexture,
+                        1.5f, 1.5f, 0.0f, WHITE
+                    );
+                }
             }
 
             break;
         }
 
-        //==========================================
-        // ゲーム処理
-        //==========================================
-        case Game:
-        {
-            if (!isTransitioningToBonus)
-            {
-                //============================
-                //プレイヤー移動処理
-                //============================
+                  //==========================================
+                  // 通常ゲーム
+                  //==========================================
+        case Game: {
+
+            if (!isTransitioningToBonus) {
+
                 player.worldLeftTop.posX += kMoveSpeed;
-                if (keys[DIK_A])
-                {
-                    player.worldLeftTop.posX -= 30;
+
+                if (keys[DIK_A]) {
+                    player.worldLeftTop.posX -= 30.0f;
                 }
 
-                //===========================
-                //ジャンプ
-                //===========================
                 if (preKeys[DIK_SPACE] == 0 &&
                     keys[DIK_SPACE] != 0 &&
-                    jumpCount < kMaxJumpCount)
-                {
-                    Novice::PlayAudio(jumpSound, false, 0.8f);
+                    jumpCount < kMaxJumpCount) {
+
                     playerVelocityY = -kJumpPower;
                     isJumping = true;
                     jumpCount++;
-                }
-            }
 
-            if (isJumping)
-            {
-                jumpAnimationTimer++;
-
-                if (jumpAnimationTimer >= 10)
-                {
-                    jumpAnimationTimer = 0;
-                    jumpFrame++;
-
-                    if (jumpFrame >= kJumpFrameCount)
-                    {
-                        jumpFrame = 0;
+                    if (jumpSound != -1) {
+                        Novice::PlayAudio(
+                            jumpSound, false, 0.8f
+                        );
                     }
                 }
             }
 
-            //===========================
-            //重力
-            //===========================
-            if (isJumping)
-            {
+            // 重力
+            if (isJumping) {
                 playerVelocityY += kGravity;
                 player.worldLeftTop.posY += playerVelocityY;
             }
 
-            //===========================
-            //トランポリン判定
-            //===========================
-            for (int i = 0; i < kTrampolineCount; i++)
-            {
-                float trampolineX = trampolinePositions[i].posX;
-                float trampolineY = trampolinePositions[i].posY;
+            // ジャンプアニメーション
+            if (isJumping) {
 
-                float trampolineRight = trampolineX + kTrampolineWidth;
-                float playerBottom = player.worldLeftTop.posY + player.size.posY;
-                float playerRight = player.worldLeftTop.posX + player.size.posX;
+                jumpAnimationTimer++;
 
-                if (playerVelocityY > 0.0f)
-                {
-                    if (player.worldLeftTop.posX < trampolineRight && playerRight > trampolineX)
-                    {
-                        if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
-                        {
-                            player.worldLeftTop.posY = trampolineY - player.size.posY;
-                            playerVelocityY = -kTrampolineBouncePower;
-                            Novice::PlayAudio(trampolineSound, false, 0.8f);
-                            isJumping = true;
-                        }
+                if (jumpAnimationTimer >= 10) {
+                    jumpAnimationTimer = 0;
+                    jumpFrame =
+                        (jumpFrame + 1) % kJumpFrameCount;
+                }
+            }
+
+            // トランポリン
+            for (int i = 0; i < kTrampolineCount; i++) {
+
+                float trampolineX =
+                    trampolinePositions[i].posX;
+
+                float trampolineY =
+                    trampolinePositions[i].posY;
+
+                float playerRight =
+                    player.worldLeftTop.posX + player.size.posX;
+
+                float playerBottom =
+                    player.worldLeftTop.posY + player.size.posY;
+
+                if (playerVelocityY > 0.0f &&
+                    player.worldLeftTop.posX <
+                    trampolineX + kTrampolineWidth &&
+                    playerRight > trampolineX &&
+                    playerBottom >= trampolineY &&
+                    playerBottom <= trampolineY + 20.0f) {
+
+                    player.worldLeftTop.posY =
+                        trampolineY - player.size.posY;
+
+                    playerVelocityY = -kTrampolineBouncePower;
+                    isJumping = true;
+
+                    if (trampolineSound != -1) {
+                        Novice::PlayAudio(
+                            trampolineSound, false, 0.8f
+                        );
                     }
                 }
             }
 
-            // 画面上外飛び出しチェック（宇宙へ遷移）
-            if (player.worldLeftTop.posY < -100.0f && !isTransitioningToBonus)
-            {
+            //==========================================
+            // 宇宙へ移動
+            //==========================================
+            if (player.worldLeftTop.posY < -100.0f &&
+                !isTransitioningToBonus) {
+
                 isTransitioningToBonus = true;
                 bonusTransitionTimer = 0;
-
-                // 跳び上がった瞬間の位置を記憶
                 savedPlayerX = player.worldLeftTop.posX;
             }
 
-            //===========================
-            //地面判定
-            //===========================
-            if (player.worldLeftTop.posY >= kGroundY)
-            {
+            // 地面判定
+            if (player.worldLeftTop.posY >= kGroundY) {
+
                 player.worldLeftTop.posY = kGroundY;
                 playerVelocityY = 0.0f;
                 isJumping = false;
                 jumpCount = 0;
             }
 
-            //===========================
-            //コイン判定
-            //===========================
-            for (int y = 0; y < kCoinMapHeight; y++)
-            {
-                for (int x = 0; x < kCoinMapWidth; x++)
-                {
-                    if (coinMap[y][x] != 1)
-                    {
+            // コイン判定
+            for (int y = 0; y < kCoinMapHeight; y++) {
+                for (int x = 0; x < kCoinMapWidth; x++) {
+
+                    if (coinMap[y][x] != 1) {
                         continue;
                     }
 
                     float coinX = static_cast<float>(x * kCoinMapSize);
                     float coinY = static_cast<float>(y * kCoinMapSize);
 
-                    float coinRight = coinX + kCoinSize;
-                    float coinBottom = coinY + kCoinSize;
+                    if (player.worldLeftTop.posX < coinX + kCoinSize &&
+                        player.worldLeftTop.posX + player.size.posX > coinX &&
+                        player.worldLeftTop.posY < coinY + kCoinSize &&
+                        player.worldLeftTop.posY + player.size.posY > coinY) {
 
-                    float playerRight = player.worldLeftTop.posX + player.size.posX;
-                    float playerBottom = player.worldLeftTop.posY + player.size.posY;
-
-                    if (player.worldLeftTop.posX < coinRight &&
-                        playerRight > coinX &&
-                        player.worldLeftTop.posY < coinBottom &&
-                        playerBottom > coinY)
-                    {
                         coinMap[y][x] = 0;
                         coinCount++;
-                        Novice::PlayAudio(coinSound, false, 0.8f);
+
+                        if (coinSound != -1) {
+                            Novice::PlayAudio(
+                                coinSound, false, 0.8f
+                            );
+                        }
                     }
                 }
             }
 
-            //===========================
-            //壁判定
-            //===========================
-            if (player.worldLeftTop.posX < 0.0f)
-            {
+            // 画面端
+            if (player.worldLeftTop.posX < 0.0f) {
                 player.worldLeftTop.posX = 0.0f;
             }
 
-            if (player.worldLeftTop.posX > kStageWidth - player.size.posX)
-            {
-                player.worldLeftTop.posX = kStageWidth - player.size.posX;
+            if (player.worldLeftTop.posX >
+                kStageWidth - player.size.posX) {
+
+                player.worldLeftTop.posX =
+                    kStageWidth - player.size.posX;
             }
 
-            //===========================
-            //スクロール処理
-            //===========================
-            scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
+            // スクロール
+            scrollValue =
+                player.worldLeftTop.posX +
+                player.size.posX - scrollStartPositionX;
 
-            if (scrollValue < 0.0f)
-            {
+            if (scrollValue < 0.0f) {
                 scrollValue = 0.0f;
             }
 
-            if (scrollValue > kMaxScroll)
-            {
+            if (scrollValue > kMaxScroll) {
                 scrollValue = kMaxScroll;
             }
 
-            //============================
-            //背景描画
-            //============================
-            for (int i = 0; i < 4; i++)
-            {
-                const float kBackGroudScreenLeftTopX =
-                    backGrounds[i].worldLeftTop.posX - scrollValue;
+            // 背景
+            for (int i = 0; i < 4; i++) {
 
-                Novice::DrawSprite(
-                    static_cast<int>(kBackGroudScreenLeftTopX),
-                    static_cast<int>(backGrounds[i].worldLeftTop.posY),
-                    backgroundTexture[i],
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
-                );
-            }
-
-            //===========================
-            //トランポリン描画
-            //===========================
-            for (int i = 0; i < kTrampolineCount; i++)
-            {
-                int screenX = static_cast<int>(trampolinePositions[i].posX - scrollValue);
-                int screenY = static_cast<int>(trampolinePositions[i].posY);
-
-                Novice::DrawSprite(
-                    screenX,
-                    screenY,
-                    trampoline,
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
-                );
-            }
-
-            //===========================
-            //コイン描画
-            //===========================
-            for (int y = 0; y < kCoinMapHeight; y++)
-            {
-                for (int x = 0; x < kCoinMapWidth; x++)
-                {
-                    if (coinMap[y][x] != 1)
-                    {
-                        continue;
-                    }
-
-                    float coinX = static_cast<float>(x * kCoinMapSize);
-                    float coinY = static_cast<float>(y * kCoinMapSize);
-
-                    int screenX = static_cast<int>(coinX - scrollValue);
-                    int screenY = static_cast<int>(coinY);
-
+                if (backgroundTexture != -1) {
                     Novice::DrawSprite(
-                        screenX,
-                        screenY,
-                        coin,
-                        1.0f,
-                        1.0f,
-                        0.0f,
-                        WHITE
+                        static_cast<int>(1280.0f * i - scrollValue),
+                        0,
+                        backgroundTexture,
+                        1.0f, 1.0f, 0.0f, WHITE
                     );
                 }
             }
 
-            //===========================
-            //コイン枚数描画
-            //===========================
-            Novice::ScreenPrintf(
-                20,
-                20,
-                "COIN : %d",
-                coinCount
-            );
+            // トランポリン描画
+            for (int i = 0; i < kTrampolineCount; i++) {
 
-            //===========================
-            //プレイヤー描画
-            //===========================
-            if (isJumping)
-            {
+                if (trampoline != -1) {
+                    Novice::DrawSprite(
+                        static_cast<int>(
+                            trampolinePositions[i].posX - scrollValue
+                            ),
+                        static_cast<int>(
+                            trampolinePositions[i].posY
+                            ),
+                        trampoline,
+                        1.0f, 1.0f, 0.0f, WHITE
+                    );
+                }
+            }
+
+            // コイン描画
+            for (int y = 0; y < kCoinMapHeight; y++) {
+                for (int x = 0; x < kCoinMapWidth; x++) {
+
+                    if (coinMap[y][x] == 1 && coin != -1) {
+                        Novice::DrawSprite(
+                            static_cast<int>(
+                                x * kCoinMapSize - scrollValue
+                                ),
+                            y * kCoinMapSize,
+                            coin,
+                            1.0f, 1.0f, 0.0f, WHITE
+                        );
+                    }
+                }
+            }
+
+            // プレイヤー
+            if (isJumping && playerJumpTexture != -1) {
+
                 Novice::DrawSpriteRect(
-                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(
+                        player.worldLeftTop.posX - scrollValue
+                        ),
                     static_cast<int>(player.worldLeftTop.posY),
                     jumpFrame * 128,
                     0,
-                    128,
-                    128,
+                    128, 128,
                     playerJumpTexture,
-                    1.0f / 4.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
+                    0.25f, 1.0f,
+                    0.0f, WHITE
                 );
+
             }
-            else
-            {
+            else if (playerTexture != -1) {
+
                 Novice::DrawSprite(
-                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(
+                        player.worldLeftTop.posX - scrollValue
+                        ),
                     static_cast<int>(player.worldLeftTop.posY),
                     playerTexture,
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
+                    1.0f, 1.0f, 0.0f, WHITE
                 );
             }
 
-            // 宇宙ボーナスステージ遷移暗転処理
-            if (isTransitioningToBonus)
-            {
+            Novice::ScreenPrintf(
+                20, 20, "COIN : %d", coinCount
+            );
+
+            //==========================================
+            // 宇宙へのフェードアウト
+            //==========================================
+            if (isTransitioningToBonus) {
+
                 bonusTransitionTimer++;
-                int alpha = (bonusTransitionTimer * 255) / kMaxTransitionTime;
-                if (alpha > 255)
-                {
+
+                int alpha =
+                    bonusTransitionTimer * 255 / kMaxTransitionTime;
+
+                if (alpha > 255) {
                     alpha = 255;
                 }
 
                 Novice::DrawBox(
-                    0,
-                    0,
-                    1280,
-                    720,
+                    0, 0, 1280, 720,
                     0.0f,
                     static_cast<unsigned int>(alpha),
                     kFillModeSolid
                 );
 
-                if (bonusTransitionTimer >= kMaxTransitionTime)
-                {
+                if (bonusTransitionTimer >= kMaxTransitionTime) {
+
                     scene = BonusStage;
                     isTransitioningToBonus = false;
                     bonusTransitionTimer = 0;
 
                     batteryFrame = 0;
                     batteryTimer = 0;
+
                     isTransitioningFromBonus = false;
                     bonusExitTransitionTimer = 0;
 
                     player.worldLeftTop.posY = 200.0f;
                     playerVelocityY = 0.0f;
 
-                    if (fireSound != -1)
-                    {
-                        firePlayHandle = Novice::PlayAudio(fireSound, true, 0.2f);
+                    //==================================
+                    // ★宇宙に入ったらfireを常時再生
+                    //==================================
+                    if (firePlayHandle != -1) {
+                        Novice::StopAudio(firePlayHandle);
+                        firePlayHandle = -1;
+                    }
+
+                    if (fireSound != -1) {
+                        firePlayHandle =
+                            Novice::PlayAudio(
+                                fireSound,
+                                true,
+                                0.2f
+                            );
                     }
                 }
             }
@@ -978,167 +921,218 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             break;
         }
 
-        //==========================================
-        // 宇宙ボーナスステージ
-        //==========================================
-        case BonusStage:
-        {
-            // 燃料切れ判定
-            bool isOutOfFuel = (batteryFrame >= kBatteryFrameCount - 1);
+                 //==========================================
+                 // 宇宙ボーナスステージ
+                 //==========================================
+        case BonusStage: {
 
-            // 1. バッテリー（燃料）のアニメーション処理（3秒毎に更新）
-            if (!isOutOfFuel)
-            {
+            //==========================================
+            // バッテリー更新
+            //==========================================
+            if (batteryFrame < kBatteryFrameCount - 1) {
+
                 batteryTimer++;
-                if (batteryTimer >= 180)
-                {
+
+                if (batteryTimer >= 180) {
                     batteryTimer = 0;
                     batteryFrame++;
-
-                    if (batteryFrame >= kBatteryFrameCount - 1)
-                    {
-                        if (firePlayHandle != -1)
-                        {
-                            Novice::StopAudio(firePlayHandle);
-                            firePlayHandle = -1;
-                        }
-                    }
                 }
             }
 
-            // 2. 自動前進
+            bool isOutOfFuel =
+                batteryFrame >= kBatteryFrameCount - 1;
+
+            //==========================================
+            // ★燃料切れでfire音を停止
+            //==========================================
+            if (isOutOfFuel && firePlayHandle != -1) {
+
+                Novice::StopAudio(firePlayHandle);
+                firePlayHandle = -1;
+            }
+
+            // 自動前進
             player.worldLeftTop.posX += kMoveSpeed * 0.5f;
 
-            if (!isOutOfFuel)
-            {
-                if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0)
-                {
+            //==========================================
+            // SPACEで浮上（音は鳴らさない）
+            //==========================================
+            if (!isOutOfFuel) {
+
+                if (preKeys[DIK_SPACE] == 0 &&
+                    keys[DIK_SPACE] != 0) {
+
                     playerVelocityY = -6.0f;
                 }
             }
 
-            // 重力処理
+            // 重力
             const float kSpaceGravity = 0.25f;
+
             playerVelocityY += kSpaceGravity;
 
-            // 燃料切れの場合は落下スピード上限を外して加速落下させる
-            if (!isOutOfFuel)
-            {
-                if (playerVelocityY > 4.0f)
-                {
+            if (!isOutOfFuel) {
+
+                if (playerVelocityY > 4.0f) {
                     playerVelocityY = 4.0f;
                 }
+
             }
-            else
-            {
-                if (playerVelocityY > 12.0f)
-                {
+            else {
+
+                if (playerVelocityY > 12.0f) {
                     playerVelocityY = 12.0f;
                 }
             }
 
             player.worldLeftTop.posY += playerVelocityY;
 
-            if (player.worldLeftTop.posY < 0.0f)
-            {
+            // 天井判定
+            if (player.worldLeftTop.posY < 0.0f) {
+
                 player.worldLeftTop.posY = 0.0f;
                 playerVelocityY = 0.0f;
             }
 
-            if (!isOutOfFuel)
-            {
-                if (player.worldLeftTop.posY >= kGroundY)
-                {
-                    player.worldLeftTop.posY = kGroundY;
-                    playerVelocityY = 0.0f;
-                }
+            // 燃料がある間の地面判定
+            if (!isOutOfFuel &&
+                player.worldLeftTop.posY >= kGroundY) {
+
+                player.worldLeftTop.posY = kGroundY;
+                playerVelocityY = 0.0f;
             }
 
+            //==========================================
+            // 宇宙ペンギンアニメーション
+            //==========================================
             universeAnimationTimer++;
-            if (universeAnimationTimer >= 8)
-            {
+
+            if (universeAnimationTimer >= 8) {
+
                 universeAnimationTimer = 0;
-                universeFrame = (universeFrame + 1) % kUniverseFrameCount;
+
+                universeFrame =
+                    (universeFrame + 1) % kUniverseFrameCount;
             }
 
-            // 6. スクロール処理
-            scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
-            if (scrollValue < 0.0f) scrollValue = 0.0f;
+            //==========================================
+            // 宇宙背景スクロール
+            //==========================================
+            scrollValue =
+                player.worldLeftTop.posX +
+                player.size.posX - scrollStartPositionX;
+
+            if (scrollValue < 0.0f) {
+                scrollValue = 0.0f;
+            }
 
             const float kLoopWidth = 2560.0f;
-            float loopScroll = fmodf(scrollValue, kLoopWidth);
 
-            float universe1X = 0.0f - loopScroll;
-            if (universe1X <= -1280.0f) universe1X += kLoopWidth;
+            float loopScroll =
+                fmodf(scrollValue, kLoopWidth);
+
+            float universe1X = -loopScroll;
+
+            if (universe1X <= -1280.0f) {
+                universe1X += kLoopWidth;
+            }
 
             float universe2X = 1280.0f - loopScroll;
-            if (universe2X <= -1280.0f) universe2X += kLoopWidth;
 
-            // 宇宙背景描画
-            if (universeTexture != -1)
-            {
-                Novice::DrawSprite(static_cast<int>(universe1X), 0, universeTexture, 1.0f, 1.0f, 0.0f, WHITE);
-            }
-            if (universe2Texture != -1)
-            {
-                Novice::DrawSprite(static_cast<int>(universe2X), 0, universe2Texture, 1.0f, 1.0f, 0.0f, WHITE);
+            if (universe2X <= -1280.0f) {
+                universe2X += kLoopWidth;
             }
 
-            // 7. 宇宙ペンギン描画
-            if (universepengin != -1)
-            {
-                Novice::DrawSpriteRect(
-                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
-                    static_cast<int>(player.worldLeftTop.posY),
-                    universeFrame * 128,
+            // 宇宙背景1
+            if (universeTexture != -1) {
+
+                Novice::DrawSprite(
+                    static_cast<int>(universe1X),
                     0,
-                    128,
-                    128,
-                    universepengin,
-                    1.0f / static_cast<float>(kUniverseFrameCount),
-                    1.0f,
-                    0.0f,
-                    WHITE
+                    universeTexture,
+                    1.0f, 1.0f, 0.0f, WHITE
                 );
             }
 
-            // 8. 左上にバッテリー画像の描画（1コマ 256x256）
-            if (batteryTexture != -1)
-            {
+            // 宇宙背景2
+            if (universe2Texture != -1) {
+
+                Novice::DrawSprite(
+                    static_cast<int>(universe2X),
+                    0,
+                    universe2Texture,
+                    1.0f, 1.0f, 0.0f, WHITE
+                );
+            }
+
+            //==========================================
+            // 宇宙ペンギン描画
+            //==========================================
+            if (universepengin != -1) {
+
+                Novice::DrawSpriteRect(
+                    static_cast<int>(
+                        player.worldLeftTop.posX - scrollValue
+                        ),
+                    static_cast<int>(player.worldLeftTop.posY),
+                    universeFrame * 128,
+                    0,
+                    128, 128,
+                    universepengin,
+                    1.0f / static_cast<float>(kUniverseFrameCount),
+                    1.0f,
+                    0.0f, WHITE
+                );
+            }
+
+            //==========================================
+            // バッテリー描画
+            //==========================================
+            if (batteryTexture != -1) {
+
                 const int kBatteryWidth = 256;
                 const int kBatteryHeight = 256;
-                const int kBatteryImageWidth = kBatteryWidth * kBatteryFrameCount;
+                const int kBatteryImageWidth =
+                    kBatteryWidth * kBatteryFrameCount;
 
                 float scale = 0.5f;
 
                 Novice::DrawSpriteRect(
-                    20,
-                    20,
+                    20, 20,
                     batteryFrame * kBatteryWidth,
                     0,
                     kBatteryWidth,
                     kBatteryHeight,
                     batteryTexture,
-                    (static_cast<float>(kBatteryWidth) / static_cast<float>(kBatteryImageWidth)) * scale,
-                    1.0f * scale,
-                    0.0f,
-                    WHITE
+                    (static_cast<float>(kBatteryWidth) /
+                        static_cast<float>(kBatteryImageWidth)) * scale,
+                    scale,
+                    0.0f, WHITE
                 );
             }
 
-            // 9. 画面外落下＆土管風シーン切り替え判定
-            if (player.worldLeftTop.posY >= 720.0f && !isTransitioningFromBonus)
-            {
+            //==========================================
+            // 画面外に落ちたら戻る
+            //==========================================
+            if (player.worldLeftTop.posY >= 720.0f &&
+                !isTransitioningFromBonus) {
+
                 isTransitioningFromBonus = true;
                 bonusExitTransitionTimer = 0;
             }
 
-            // 開始時フェードイン
-            if (bonusTransitionTimer < kMaxTransitionTime)
-            {
+            // 宇宙開始時フェードイン
+            if (bonusTransitionTimer < kMaxTransitionTime) {
+
                 bonusTransitionTimer++;
-                int alpha = 255 - (bonusTransitionTimer * 255) / kMaxTransitionTime;
-                if (alpha < 0) alpha = 0;
+
+                int alpha =
+                    255 -
+                    bonusTransitionTimer * 255 / kMaxTransitionTime;
+
+                if (alpha < 0) {
+                    alpha = 0;
+                }
 
                 Novice::DrawBox(
                     0, 0, 1280, 720,
@@ -1148,11 +1142,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 );
             }
 
-            if (isTransitioningFromBonus)
-            {
+            //==========================================
+            // 宇宙終了時フェードアウト
+            //==========================================
+            if (isTransitioningFromBonus) {
+
                 bonusExitTransitionTimer++;
-                int alpha = (bonusExitTransitionTimer * 255) / 30;
-                if (alpha > 255) alpha = 255;
+
+                int alpha =
+                    bonusExitTransitionTimer * 255 / 30;
+
+                if (alpha > 255) {
+                    alpha = 255;
+                }
 
                 Novice::DrawBox(
                     0, 0, 1280, 720,
@@ -1161,27 +1163,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                     kFillModeSolid
                 );
 
-                if (bonusExitTransitionTimer >= 30)
-                {
-                    if (firePlayHandle != -1)
-                    {
+                if (bonusExitTransitionTimer >= 30) {
+
+                    // ★通常ステージに戻る時も停止
+                    if (firePlayHandle != -1) {
+
                         Novice::StopAudio(firePlayHandle);
                         firePlayHandle = -1;
                     }
 
-                    // ゲームシーンへ復帰
                     scene = Game;
                     isTransitioningFromBonus = false;
                     gameFadeTimer = 0;
 
-                    player.worldLeftTop.posX = savedPlayerX - 200.0f;
-                    if (player.worldLeftTop.posX < 0.0f)
-                    {
+                    player.worldLeftTop.posX =
+                        savedPlayerX - 200.0f;
+
+                    if (player.worldLeftTop.posX < 0.0f) {
                         player.worldLeftTop.posX = 0.0f;
                     }
 
                     player.worldLeftTop.posY = kGroundY;
                     playerVelocityY = 0.0f;
+
                     isJumping = false;
                     jumpCount = 0;
                 }
@@ -1190,209 +1194,171 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             break;
         }
 
-        //==========================================
-        //==========================================
-        // チュートリアル処理
-        //==========================================
-        //==========================================
-        case tutorial:
-        {
-            //============================
-            //プレイヤー移動処理
-            //============================
+                       //==========================================
+                       // チュートリアル
+                       //==========================================
+        case tutorial: {
+
+            // 自動前進
             player.worldLeftTop.posX += kMoveSpeed;
-            if (keys[DIK_A])
-            {
-                player.worldLeftTop.posX -= 30;
+
+            if (keys[DIK_A]) {
+                player.worldLeftTop.posX -= 30.0f;
             }
 
-            //===========================
-            //ジャンプ
-            //===========================
+            // ジャンプ
             if (preKeys[DIK_SPACE] == 0 &&
                 keys[DIK_SPACE] != 0 &&
-                jumpCount < kMaxJumpCount)
-            {
-                Novice::PlayAudio(jumpSound, false, 0.8f);
+                jumpCount < kMaxJumpCount) {
+
                 playerVelocityY = -kJumpPower;
                 isJumping = true;
                 jumpCount++;
-            }
 
-            if (isJumping)
-            {
-                jumpAnimationTimer++;
-
-                if (jumpAnimationTimer >= 10)
-                {
-                    jumpAnimationTimer = 0;
-                    jumpFrame++;
-
-                    if (jumpFrame >= kJumpFrameCount)
-                    {
-                        jumpFrame = 0;
-                    }
+                if (jumpSound != -1) {
+                    Novice::PlayAudio(
+                        jumpSound, false, 0.8f
+                    );
                 }
             }
 
-            //===========================
-            //重力
-            //===========================
+            // ジャンプアニメーション
+            if (isJumping) {
 
-            // 落下前のプレイヤーの足元を保存
-            float previousPlayerBottom = player.worldLeftTop.posY + player.size.posY;
+                jumpAnimationTimer++;
 
-            if (isJumping)
-            {
+                if (jumpAnimationTimer >= 10) {
+
+                    jumpAnimationTimer = 0;
+                    jumpFrame =
+                        (jumpFrame + 1) % kJumpFrameCount;
+                }
+            }
+
+            float previousPlayerBottom =
+                player.worldLeftTop.posY + player.size.posY;
+
+            // 重力
+            if (isJumping) {
+
                 playerVelocityY += kGravity;
                 player.worldLeftTop.posY += playerVelocityY;
             }
 
-            //===========================
-            //トランポリン判定
-            //===========================
-            // プレイヤーがいるステージ番号
+            //==========================================
+            // トランポリン判定
+            //==========================================
             int collisionStageSet =
                 static_cast<int>(
                     player.worldLeftTop.posX / kStageWidth
                     );
 
-            // 前後のステージも調べる
             for (int set = collisionStageSet - 1;
-                set <= collisionStageSet + 1; set++)
-            {
-                for (int i = 0; i < kTrampolineCount; i++)
-                {
-                    // トランポリンのワールド座標
+                set <= collisionStageSet + 1; set++) {
+
+                for (int i = 0; i < kTrampolineCount; i++) {
+
                     float trampolineX =
-                        trampolinePositions[i].posX
-                        + set * kStageWidth;
+                        trampolinePositions[i].posX +
+                        set * kStageWidth;
 
                     float trampolineY =
                         trampolinePositions[i].posY;
 
-                    float trampolineRight =
-                        trampolineX + kTrampolineWidth;
-
                     float playerRight =
-                        player.worldLeftTop.posX
-                        + player.size.posX;
+                        player.worldLeftTop.posX +
+                        player.size.posX;
 
                     float playerBottom =
-                        player.worldLeftTop.posY
-                        + player.size.posY;
+                        player.worldLeftTop.posY +
+                        player.size.posY;
 
-                    // 下に落ちているときだけ判定
-                    if (playerVelocityY > 0.0f)
-                    {
-                        // 左右が重なっているか
-                        bool isOverlapX =
-                            player.worldLeftTop.posX < trampolineRight
-                            && playerRight > trampolineX;
+                    bool isOverlapX =
+                        player.worldLeftTop.posX <
+                        trampolineX + kTrampolineWidth &&
+                        playerRight > trampolineX;
 
-                        // トランポリンの上面を通過したか
-                        bool isLanding =
-                            previousPlayerBottom <= trampolineY
-                            && playerBottom >= trampolineY;
+                    bool isLanding =
+                        previousPlayerBottom <= trampolineY &&
+                        playerBottom >= trampolineY;
 
-                        if (isOverlapX && isLanding)
-                        {
-                            player.worldLeftTop.posY =
-                                trampolineY - player.size.posY;
+                    if (playerVelocityY > 0.0f &&
+                        isOverlapX && isLanding) {
 
-                            playerVelocityY = -kTrampolineBouncePower;
-                            isJumping = true;
+                        player.worldLeftTop.posY =
+                            trampolineY - player.size.posY;
 
-                            if (trampolineSound != -1)
-                            {
-                                Novice::PlayAudio(
-                                    trampolineSound, false, 0.8f
-                                );
-                            }
+                        playerVelocityY =
+                            -kTrampolineBouncePower;
+
+                        isJumping = true;
+
+                        if (trampolineSound != -1) {
+                            Novice::PlayAudio(
+                                trampolineSound, false, 0.8f
+                            );
                         }
                     }
                 }
             }
 
-            //===========================
-            //地面判定
-            //===========================
-            if (player.worldLeftTop.posY >= kGroundY)
-            {
+            // 地面判定
+            if (player.worldLeftTop.posY >= kGroundY) {
+
                 player.worldLeftTop.posY = kGroundY;
                 playerVelocityY = 0.0f;
                 isJumping = false;
                 jumpCount = 0;
             }
 
-            //===========================
-            //コイン判定
-            //===========================
-
-            // プレイヤーがいるステージ番号
+            //==========================================
+            // コイン判定
+            //==========================================
             int coinCollisionStageSet =
                 static_cast<int>(
                     player.worldLeftTop.posX / kStageWidth
                     );
 
-            // 前後のステージも判定する
             for (int set = coinCollisionStageSet - 1;
-                set <= coinCollisionStageSet + 1; set++)
-            {
-                // 存在するステージだけ調べる
-                if (set < 0 || set >= kMaxCoinStageSets)
-                {
+                set <= coinCollisionStageSet + 1; set++) {
+
+                if (set < 0 || set >= kMaxCoinStageSets) {
                     continue;
                 }
 
-                for (int y = 0; y < kCoinMapHeight; y++)
-                {
-                    for (int x = 0; x < kCoinMapWidth; x++)
-                    {
-                        // もともとコインがない場所は無視
-                        if (coinMap[y][x] != 1)
-                        {
+                for (int y = 0; y < kCoinMapHeight; y++) {
+                    for (int x = 0; x < kCoinMapWidth; x++) {
+
+                        if (coinMap[y][x] != 1 ||
+                            coinCollectedByStage[set][y][x]) {
                             continue;
                         }
 
-                        // このステージですでに取ったコインは無視
-                        if (coinCollectedByStage[set][y][x])
-                        {
-                            continue;
-                        }
-
-                        // コインのワールド座標
                         float coinX =
-                            x * kCoinMapSize
-                            + set * kStageWidth;
+                            x * kCoinMapSize + set * kStageWidth;
 
-                        int coinY =
-                            y * kCoinMapSize;
-
-                        float coinRight = coinX + kCoinSize;
-                        float coinBottom = coinY + kCoinSize;
+                        float coinY =
+                            static_cast<float>(y * kCoinMapSize);
 
                         float playerRight =
-                            player.worldLeftTop.posX
-                            + player.size.posX;
+                            player.worldLeftTop.posX +
+                            player.size.posX;
 
                         float playerBottom =
-                            player.worldLeftTop.posY
-                            + player.size.posY;
+                            player.worldLeftTop.posY +
+                            player.size.posY;
 
-                        // プレイヤーとコインが重なったか
-                        if (player.worldLeftTop.posX < coinRight &&
+                        if (player.worldLeftTop.posX <
+                            coinX + kCoinSize &&
                             playerRight > coinX &&
-                            player.worldLeftTop.posY < coinBottom &&
-                            playerBottom > coinY)
-                        {
-                            // このステージのコインだけ取得済みにする
-                            coinCollectedByStage[set][y][x] = true;
+                            player.worldLeftTop.posY <
+                            coinY + kCoinSize &&
+                            playerBottom > coinY) {
 
+                            coinCollectedByStage[set][y][x] = true;
                             coinCount++;
 
-                            if (coinSound != -1)
-                            {
+                            if (coinSound != -1) {
                                 Novice::PlayAudio(
                                     coinSound, false, 0.8f
                                 );
@@ -1402,206 +1368,151 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
                 }
             }
 
-            //===========================
-            //スクロール処理
-            //===========================
-            scrollValue = player.worldLeftTop.posX + player.size.posX - scrollStartPositionX;
+            //==========================================
+            // スクロール
+            //==========================================
+            scrollValue =
+                player.worldLeftTop.posX +
+                player.size.posX - scrollStartPositionX;
 
-            if (scrollValue >= kBackgroundWidth)
-            {
-                scrollValue -= kBackgroundWidth;
-            }
-
-            //============================================
-            //チュートリアル画面描画
-            //============================================
-
-            // カメラのスクロール量
-            scrollValue = player.worldLeftTop.posX
-                + player.size.posX - scrollStartPositionX;
-
-            if (scrollValue < 0.0f)
-            {
+            if (scrollValue < 0.0f) {
                 scrollValue = 0.0f;
             }
 
-            // 背景の幅でループさせる
-            float loopScroll = fmodf(scrollValue, kBackgroundWidth);
+            float loopScroll =
+                fmodf(scrollValue, kBackgroundWidth);
 
-            //===========================
-            // チュートリアル背景描画
-            //===========================
-            for (int i = 0; i < 8; i++)
-            {
+            // 背景
+            for (int i = 0; i < 8; i++) {
+
                 int textureIndex = i % 4;
 
                 float backgroundX =
                     1280.0f * i - loopScroll;
 
-                if (backgroundTexture[textureIndex] != -1)
-                {
+                if (textureIndex >= 0 &&
+                    backgroundTexture != -1) {
+
                     Novice::DrawSprite(
                         static_cast<int>(backgroundX),
                         0,
-                        backgroundTexture[textureIndex],
-                        1.0f,
-                        1.0f,
-                        0.0f,
-                        WHITE
+                        backgroundTexture,
+                        1.0f, 1.0f, 0.0f, WHITE
                     );
                 }
             }
 
             int stageSet =
-                static_cast<int>(player.worldLeftTop.posX / kStageWidth);
-
-            //===========================
-            // トランポリン描画
-            //===========================
-
-            // 前後のステージのトランポリンも描画する
-            for (int set = stageSet - 1;
-                set <= stageSet + 1; set++)
-            {
-                for (int i = 0; i < kTrampolineCount; i++)
-                {
-                    // トランポリンのワールド座標
-                    float trampolineWorldX =
-                        trampolinePositions[i].posX
-                        + set * kStageWidth;
-
-                    // スクロール量を引いて画面座標に変換
-                    int screenX = static_cast<int>(
-                        trampolineWorldX - scrollValue
-                        );
-
-                    int screenY = static_cast<int>(
-                        trampolinePositions[i].posY
-                        );
-
-                    // 画面の外にあるものは描画しない
-                    if (screenX + kTrampolineWidth < 0 ||
-                        screenX > 1280)
-                    {
-                        continue;
-                    }
-
-                    Novice::DrawSprite(
-                        screenX,
-                        screenY,
-                        trampoline,
-                        1.0f,
-                        1.0f,
-                        0.0f,
-                        WHITE
-                    );
-                }
-            }
-
-            //===========================
-            // コイン描画
-            //===========================
-           // プレイヤーがいるステージ番号
-            int coinDrawStageSet =
                 static_cast<int>(
                     player.worldLeftTop.posX / kStageWidth
                     );
 
-            // 前後のステージのコインも描画する
-            for (int set = coinDrawStageSet - 1;
-                set <= coinDrawStageSet + 1; set++)
-            {
-                if (set < 0 || set >= kMaxCoinStageSets)
-                {
-                    continue;
-                }
+            // トランポリン描画
+            for (int set = stageSet - 1;
+                set <= stageSet + 1; set++) {
 
-                for (int y = 0; y < kCoinMapHeight; y++)
-                {
-                    for (int x = 0; x < kCoinMapWidth; x++)
-                    {
-                        // コインが配置されていない場所
-                        if (coinMap[y][x] != 1)
-                        {
-                            continue;
-                        }
+                for (int i = 0; i < kTrampolineCount; i++) {
 
-                        // 取得済みのコインは描画しない
-                        if (coinCollectedByStage[set][y][x])
-                        {
-                            continue;
-                        }
+                    float trampolineWorldX =
+                        trampolinePositions[i].posX +
+                        set * kStageWidth;
 
-                        // コインのワールド座標
-                        float coinX =
-                            x * kCoinMapSize
-                            + set * kStageWidth;
-
-                        int coinY =
-                            y * kCoinMapSize;
-
-                        // ワールド座標から画面座標へ変換
-                        int screenX = static_cast<int>(
-                            coinX - scrollValue
+                    int screenX =
+                        static_cast<int>(
+                            trampolineWorldX - scrollValue
                             );
 
-                        int screenY = static_cast<int>(coinY);
+                    if (screenX + kTrampolineWidth < 0 ||
+                        screenX > 1280) {
+                        continue;
+                    }
 
-                        // 画面外のコインは描画しない
-                        if (screenX + kCoinSize < 0 ||
-                            screenX > 1280)
-                        {
-                            continue;
-                        }
-
+                    if (trampoline != -1) {
                         Novice::DrawSprite(
                             screenX,
-                            screenY,
-                            coin,
-                            1.0f,
-                            1.0f,
-                            0.0f,
-                            WHITE
+                            static_cast<int>(
+                                trampolinePositions[i].posY
+                                ),
+                            trampoline,
+                            1.0f, 1.0f, 0.0f, WHITE
                         );
                     }
                 }
             }
 
-            if (isJumping)
-            {
+            // コイン描画
+            for (int set = stageSet - 1;
+                set <= stageSet + 1; set++) {
+
+                if (set < 0 || set >= kMaxCoinStageSets) {
+                    continue;
+                }
+
+                for (int y = 0; y < kCoinMapHeight; y++) {
+                    for (int x = 0; x < kCoinMapWidth; x++) {
+
+                        if (coinMap[y][x] != 1 ||
+                            coinCollectedByStage[set][y][x]) {
+                            continue;
+                        }
+
+                        float coinX =
+                            x * kCoinMapSize +
+                            set * kStageWidth;
+
+                        int screenX =
+                            static_cast<int>(coinX - scrollValue);
+
+                        if (screenX + kCoinSize < 0 ||
+                            screenX > 1280) {
+                            continue;
+                        }
+
+                        if (coin != -1) {
+                            Novice::DrawSprite(
+                                screenX,
+                                y * kCoinMapSize,
+                                coin,
+                                1.0f, 1.0f, 0.0f, WHITE
+                            );
+                        }
+                    }
+                }
+            }
+
+            // プレイヤー
+            if (isJumping && playerJumpTexture != -1) {
+
                 Novice::DrawSpriteRect(
-                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(
+                        player.worldLeftTop.posX - scrollValue
+                        ),
                     static_cast<int>(player.worldLeftTop.posY),
                     jumpFrame * 128,
                     0,
-                    128,
-                    128,
+                    128, 128,
                     playerJumpTexture,
-                    1.0f / 4.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
+                    0.25f, 1.0f,
+                    0.0f, WHITE
                 );
+
             }
-            else
-            {
+            else if (playerTexture != -1) {
+
                 Novice::DrawSprite(
-                    static_cast<int>(player.worldLeftTop.posX - scrollValue),
+                    static_cast<int>(
+                        player.worldLeftTop.posX - scrollValue
+                        ),
                     static_cast<int>(player.worldLeftTop.posY),
                     playerTexture,
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
+                    1.0f, 1.0f, 0.0f, WHITE
                 );
             }
 
             Novice::ScreenPrintf(
-                20,
-                20,
-                "COIN : %d",
-                coinCount
+                20, 20, "COIN : %d", coinCount
             );
+
             break;
         }
         }
@@ -1609,17 +1520,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         //==========================================
         // シーン切り替えフェードイン
         //==========================================
-        if (scene != Title && gameFadeTimer < 60 && !isTransitioningToBonus && scene != BonusStage)
-        {
-            int alpha = 255 - gameFadeTimer * 255 / 60;
+        if (scene != Title &&
+            gameFadeTimer < 60 &&
+            !isTransitioningToBonus &&
+            scene != BonusStage) {
 
-            unsigned int fadeColor =
-                static_cast<unsigned int>(alpha);
+            int alpha =
+                255 - gameFadeTimer * 255 / 60;
 
             Novice::DrawBox(
                 0, 0, 1280, 720,
                 0.0f,
-                fadeColor,
+                static_cast<unsigned int>(alpha),
                 kFillModeSolid
             );
 
@@ -1629,10 +1541,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         Novice::EndFrame();
 
         if (preKeys[DIK_ESCAPE] == 0 &&
-            keys[DIK_ESCAPE] != 0)
-        {
+            keys[DIK_ESCAPE] != 0 &&
+            scene != Title) {
             break;
         }
+    }
+
+    // 終了時fireを停止
+    if (firePlayHandle != -1) {
+        Novice::StopAudio(firePlayHandle);
     }
 
     Novice::Finalize();
