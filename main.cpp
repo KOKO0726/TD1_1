@@ -211,6 +211,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
     const int kCoinMapSize = 64;
     const float kCoinSize = 64.0f;
 
+    // ステージごとに、コインを取得したか記録する
+    const int kMaxCoinStageSets = 100;
+    bool coinCollectedByStage[kMaxCoinStageSets]
+        [kCoinMapHeight][kCoinMapWidth] = {};
+
     int coinCount = 0;
 
     //==========================================
@@ -1061,7 +1066,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         }
 
         //==========================================
+        //==========================================
         // チュートリアル処理
+        //==========================================
         //==========================================
         case tutorial:
         {
@@ -1106,6 +1113,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //===========================
             //重力
             //===========================
+
+            // 落下前のプレイヤーの足元を保存
+            float previousPlayerBottom = player.worldLeftTop.posY + player.size.posY;
+
             if (isJumping)
             {
                 playerVelocityY += kGravity;
@@ -1115,25 +1126,64 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //===========================
             //トランポリン判定
             //===========================
-            for (int i = 0; i < kTrampolineCount; i++)
+            // プレイヤーがいるステージ番号
+            int collisionStageSet =
+                static_cast<int>(
+                    player.worldLeftTop.posX / kStageWidth
+                    );
+
+            // 前後のステージも調べる
+            for (int set = collisionStageSet - 1;
+                set <= collisionStageSet + 1; set++)
             {
-                float trampolineX = trampolinePositions[i].posX;
-                float trampolineY = trampolinePositions[i].posY;
-
-                float trampolineRight = trampolineX + kTrampolineWidth;
-                float playerBottom = player.worldLeftTop.posY + player.size.posY;
-                float playerRight = player.worldLeftTop.posX + player.size.posX;
-
-                if (playerVelocityY > 0.0f)
+                for (int i = 0; i < kTrampolineCount; i++)
                 {
-                    if (player.worldLeftTop.posX < trampolineRight && playerRight > trampolineX)
+                    // トランポリンのワールド座標
+                    float trampolineX =
+                        trampolinePositions[i].posX
+                        + set * kStageWidth;
+
+                    float trampolineY =
+                        trampolinePositions[i].posY;
+
+                    float trampolineRight =
+                        trampolineX + kTrampolineWidth;
+
+                    float playerRight =
+                        player.worldLeftTop.posX
+                        + player.size.posX;
+
+                    float playerBottom =
+                        player.worldLeftTop.posY
+                        + player.size.posY;
+
+                    // 下に落ちているときだけ判定
+                    if (playerVelocityY > 0.0f)
                     {
-                        if (playerBottom >= trampolineY && playerBottom <= trampolineY + 20.0f)
+                        // 左右が重なっているか
+                        bool isOverlapX =
+                            player.worldLeftTop.posX < trampolineRight
+                            && playerRight > trampolineX;
+
+                        // トランポリンの上面を通過したか
+                        bool isLanding =
+                            previousPlayerBottom <= trampolineY
+                            && playerBottom >= trampolineY;
+
+                        if (isOverlapX && isLanding)
                         {
-                            player.worldLeftTop.posY = trampolineY - player.size.posY;
+                            player.worldLeftTop.posY =
+                                trampolineY - player.size.posY;
+
                             playerVelocityY = -kTrampolineBouncePower;
-                            Novice::PlayAudio(trampolineSound, false, 0.8f);
                             isJumping = true;
+
+                            if (trampolineSound != -1)
+                            {
+                                Novice::PlayAudio(
+                                    trampolineSound, false, 0.8f
+                                );
+                            }
                         }
                     }
                 }
@@ -1153,32 +1203,76 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //===========================
             //コイン判定
             //===========================
-            for (int y = 0; y < kCoinMapHeight; y++)
+
+            // プレイヤーがいるステージ番号
+            int coinCollisionStageSet =
+                static_cast<int>(
+                    player.worldLeftTop.posX / kStageWidth
+                    );
+
+            // 前後のステージも判定する
+            for (int set = coinCollisionStageSet - 1;
+                set <= coinCollisionStageSet + 1; set++)
             {
-                for (int x = 0; x < kCoinMapWidth; x++)
+                // 存在するステージだけ調べる
+                if (set < 0 || set >= kMaxCoinStageSets)
                 {
-                    if (coinMap[y][x] != 1)
+                    continue;
+                }
+
+                for (int y = 0; y < kCoinMapHeight; y++)
+                {
+                    for (int x = 0; x < kCoinMapWidth; x++)
                     {
-                        continue;
-                    }
+                        // もともとコインがない場所は無視
+                        if (coinMap[y][x] != 1)
+                        {
+                            continue;
+                        }
 
-                    float coinX = static_cast<float>(x * kCoinMapSize);
-                    float coinY = static_cast<float>(y * kCoinMapSize);
+                        // このステージですでに取ったコインは無視
+                        if (coinCollectedByStage[set][y][x])
+                        {
+                            continue;
+                        }
 
-                    float coinRight = coinX + kCoinSize;
-                    float coinBottom = coinY + kCoinSize;
+                        // コインのワールド座標
+                        float coinX =
+                            x * kCoinMapSize
+                            + set * kStageWidth;
 
-                    float playerRight = player.worldLeftTop.posX + player.size.posX;
-                    float playerBottom = player.worldLeftTop.posY + player.size.posY;
+                        int coinY =
+                            y * kCoinMapSize;
 
-                    if (player.worldLeftTop.posX < coinRight &&
-                        playerRight > coinX &&
-                        player.worldLeftTop.posY < coinBottom &&
-                        playerBottom > coinY)
-                    {
-                        coinMap[y][x] = 0;
-                        coinCount++;
-                        Novice::PlayAudio(coinSound, false, 0.8f);
+                        float coinRight = coinX + kCoinSize;
+                        float coinBottom = coinY + kCoinSize;
+
+                        float playerRight =
+                            player.worldLeftTop.posX
+                            + player.size.posX;
+
+                        float playerBottom =
+                            player.worldLeftTop.posY
+                            + player.size.posY;
+
+                        // プレイヤーとコインが重なったか
+                        if (player.worldLeftTop.posX < coinRight &&
+                            playerRight > coinX &&
+                            player.worldLeftTop.posY < coinBottom &&
+                            playerBottom > coinY)
+                        {
+                            // このステージのコインだけ取得済みにする
+                            coinCollectedByStage[set][y][x] = true;
+
+                            coinCount++;
+
+                            if (coinSound != -1)
+                            {
+                                Novice::PlayAudio(
+                                    coinSound, false, 0.8f
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -1196,33 +1290,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             //============================================
             //チュートリアル画面描画
             //============================================
-            const float kBackgroundSetWidth = 1280.0f * 4.0f;
 
-            int backgroundSet =
-                static_cast<int>(
-                    player.worldLeftTop.posX / kBackgroundSetWidth
-                    );
+            // カメラのスクロール量
+            scrollValue = player.worldLeftTop.posX
+                + player.size.posX - scrollStartPositionX;
 
-            for (int set = 0; set < 2; set++)
+            if (scrollValue < 0.0f)
             {
-                float currentSetX =
-                    static_cast<float>(backgroundSet + set) *
-                    kBackgroundSetWidth;
+                scrollValue = 0.0f;
+            }
 
-                for (int i = 0; i < 4; i++)
+            // 背景の幅でループさせる
+            float loopScroll = fmodf(scrollValue, kBackgroundWidth);
+
+            //===========================
+            // チュートリアル背景描画
+            //===========================
+            for (int i = 0; i < 8; i++)
+            {
+                int textureIndex = i % 4;
+
+                float backgroundX =
+                    1280.0f * i - loopScroll;
+
+                if (backgroundTexture[textureIndex] != -1)
                 {
-                    float backgroundWorldX =
-                        currentSetX + 1280.0f * i;
-
-                    float screenX =
-                        backgroundWorldX -
-                        player.worldLeftTop.posX +
-                        scrollStartPositionX;
-
                     Novice::DrawSprite(
-                        static_cast<int>(screenX),
+                        static_cast<int>(backgroundX),
                         0,
-                        backgroundTexture[i],
+                        backgroundTexture[textureIndex],
                         1.0f,
                         1.0f,
                         0.0f,
@@ -1234,57 +1330,115 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
             int stageSet =
                 static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 
-            for (int i = 0; i < kTrampolineCount; i++)
-            {
-                float trampolineWorldX =
-                    trampolinePositions[i].posX +
-                    stageSet * kStageWidth;
+            //===========================
+            // トランポリン描画
+            //===========================
 
-                int screenX =
-                    static_cast<int>(
-                        trampolineWorldX -
-                        player.worldLeftTop.posX +
-                        scrollStartPositionX
+            // 前後のステージのトランポリンも描画する
+            for (int set = stageSet - 1;
+                set <= stageSet + 1; set++)
+            {
+                for (int i = 0; i < kTrampolineCount; i++)
+                {
+                    // トランポリンのワールド座標
+                    float trampolineWorldX =
+                        trampolinePositions[i].posX
+                        + set * kStageWidth;
+
+                    // スクロール量を引いて画面座標に変換
+                    int screenX = static_cast<int>(
+                        trampolineWorldX - scrollValue
                         );
 
-                int screenY =
-                    static_cast<int>(trampolinePositions[i].posY);
+                    int screenY = static_cast<int>(
+                        trampolinePositions[i].posY
+                        );
 
-                Novice::DrawSprite(
-                    screenX,
-                    screenY,
-                    trampoline,
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    WHITE
-                );
-            }
-
-            for (int y = 0; y < kCoinMapHeight; y++)
-            {
-                for (int x = 0; x < kCoinMapWidth; x++)
-                {
-                    if (coinMap[y][x] != 1)
+                    // 画面の外にあるものは描画しない
+                    if (screenX + kTrampolineWidth < 0 ||
+                        screenX > 1280)
                     {
                         continue;
                     }
 
-                    float coinX = static_cast<float>(x * kCoinMapSize) + stageSet * kStageWidth;
-                    float coinY = static_cast<float>(y * kCoinMapSize);
-
-                    int screenX = static_cast<int>(coinX - player.worldLeftTop.posX + scrollStartPositionX);
-                    int screenY = static_cast<int>(coinY);
-
                     Novice::DrawSprite(
                         screenX,
                         screenY,
-                        coin,
+                        trampoline,
                         1.0f,
                         1.0f,
                         0.0f,
                         WHITE
                     );
+                }
+            }
+
+            //===========================
+            // コイン描画
+            //===========================
+           // プレイヤーがいるステージ番号
+            int coinDrawStageSet =
+                static_cast<int>(
+                    player.worldLeftTop.posX / kStageWidth
+                    );
+
+            // 前後のステージのコインも描画する
+            for (int set = coinDrawStageSet - 1;
+                set <= coinDrawStageSet + 1; set++)
+            {
+                if (set < 0 || set >= kMaxCoinStageSets)
+                {
+                    continue;
+                }
+
+                for (int y = 0; y < kCoinMapHeight; y++)
+                {
+                    for (int x = 0; x < kCoinMapWidth; x++)
+                    {
+                        // コインが配置されていない場所
+                        if (coinMap[y][x] != 1)
+                        {
+                            continue;
+                        }
+
+                        // 取得済みのコインは描画しない
+                        if (coinCollectedByStage[set][y][x])
+                        {
+                            continue;
+                        }
+
+                        // コインのワールド座標
+                        float coinX =
+                            x * kCoinMapSize
+                            + set * kStageWidth;
+
+                        int coinY =
+                            y * kCoinMapSize;
+
+                        // ワールド座標から画面座標へ変換
+                        int screenX = static_cast<int>(
+                            coinX - scrollValue
+                            );
+
+                        int screenY = static_cast<int>(coinY);
+
+                        // 画面外のコインは描画しない
+                        if (screenX + kCoinSize < 0 ||
+                            screenX > 1280)
+                        {
+                            continue;
+                        }
+
+                        Novice::DrawSprite(
+                            screenX,
+                            screenY,
+                            coin,
+                            1.0f,
+                            1.0f,
+                            0.0f,
+                            WHITE
+                        );
+                    }
                 }
             }
 
