@@ -65,7 +65,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	bool isTransitioningFromBonus = false;
 	int bonusExitTransitionTimer = 0;
 
-	// ボーナスステージ用 マップチップ設定 (充電アイテム用)
+	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
 	const int kBonusMapWidth = 100;
 	const int kBonusTileSize = 64;
@@ -96,6 +96,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
+	// ダメージバッテリー
+	int damagebatteryTexture =
+		Novice::LoadTexture("./Resources/images/damagebattery.png");
 	// 電池
 	int chargingTexture =
 		Novice::LoadTexture("./Resources/images/charging.png");
@@ -988,14 +991,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					player.worldLeftTop.posY = 200.0f;
 					playerVelocityY = 0.0f;
 
-					// 充電アイテムの初期化
+					// 充電・ダメージアイテムの初期化
 					for (int y = 0; y < kBonusMapHeight; y++) {
 						for (int x = 0; x < kBonusMapWidth; x++) {
 							bonusMap[y][x] = 0;
 						}
 					}
-					// 1つのループパターン（40マス＝2560px）の中央付近(20マス目)に1個セット
-					bonusMap[3][20] = 1;
+					// 1つのループパターン（40マス＝2560px）内での配置
+					bonusMap[3][20] = 1; // 充電電池 (回復) : 1個
+					bonusMap[2][10] = 2; // ダメージ電池 (ダメージ) : 1個目
+					bonusMap[4][30] = 2; // ダメージ電池 (ダメージ) : 2個目
 
 					// 獲得フラグのリセット
 					for (int i = 0; i < kMaxBonusLoops; i++) {
@@ -1120,12 +1125,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			const float kLoopWidth = 2560.0f;
 
 			//==========================================
-			// 充電アイテムとの当たり判定（拾うと消滅）
+			// 充電・ダメージアイテムとの当たり判定（拾うと消滅）
 			//==========================================
 			for (int y = 0; y < kBonusMapHeight; y++) {
 				for (int x = 0; x < kBonusMapWidth; x++) {
 
-					if (bonusMap[y][x] != 1) {
+					if (bonusMap[y][x] == 0) {
 						continue;
 					}
 
@@ -1149,10 +1154,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 							// アイテム獲得フラグを立てて消す
 							bonusItemCollected[i][y][x] = true;
 
-							// バッテリー回復（1個分回復＝インデックスを減らす）
-							if (batteryFrame > 0) {
-								batteryFrame--;
-								batteryTimer = 0; // タイマーもリセット
+							if (bonusMap[y][x] == 1) {
+								// 充電電池: バッテリー1個分回復
+								if (batteryFrame > 0) {
+									batteryFrame--;
+									batteryTimer = 0; // タイマーリセット
+								}
+							}
+							else if (bonusMap[y][x] == 2) {
+								// ダメージ電池: バッテリー2個分減少
+								batteryFrame += 2;
+								if (batteryFrame >= kBatteryFrameCount - 1) {
+									batteryFrame = kBatteryFrameCount - 1; // 燃料切れの上限固定
+								}
+								batteryTimer = 0;
 							}
 						}
 					}
@@ -1221,12 +1236,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			//==========================================
-			// 充電アイテムの描画 (未獲得の物のみ描画)
+			// 充電・ダメージアイテムの描画 (未獲得の物のみ描画)
 			//==========================================
 			for (int y = 0; y < kBonusMapHeight; y++) {
 				for (int x = 0; x < kBonusMapWidth; x++) {
 
-					if (bonusMap[y][x] == 1 && chargingTexture != -1) {
+					int itemType = bonusMap[y][x];
+					if (itemType == 0) {
+						continue;
+					}
+
+					int targetTexture = -1;
+					if (itemType == 1) {
+						targetTexture = chargingTexture;
+					}
+					else if (itemType == 2) {
+						targetTexture = damagebatteryTexture;
+					}
+
+					if (targetTexture != -1) {
 						float baseItemX = static_cast<float>(x * kBonusTileSize);
 						int drawY = y * kBonusTileSize;
 
@@ -1243,7 +1271,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 								Novice::DrawSprite(
 									drawX,
 									drawY,
-									chargingTexture,
+									targetTexture,
 									1.0f, 1.0f, 0.0f, WHITE
 								);
 							}
