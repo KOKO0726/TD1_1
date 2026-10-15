@@ -188,10 +188,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// トランポリン
 	//==========================================
 	Vector2 trampolinePositions[] = {
-		{500.0f, 500.0f},
-		{1000.0f, 500.0f},
-		{1500.0f, 500.0f},
-		{2200.0f, 500.0f}
+		{ 500.0f, 500.0f },
+		{ 1000.0f, 500.0f },
+		{ 1500.0f, 500.0f },
+		{ 2200.0f, 500.0f }
 	};
 
 	const int kTrampolineCount =
@@ -204,39 +204,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//==========================================
 	Vector2 signboardPositions[] =
 	{
-		{350.0f, 500.0f},
-		{850.0f, 500.0f},
-		{1350.0f, 500.0f},
-		{2050.0f, 500.0f},
+		{ 350.0f, 500.0f },
+		{ 850.0f, 500.0f },
+		{ 1350.0f, 500.0f },
+		{ 2050.0f, 500.0f },
 	};
 	//==========================================
 	// コイン
 	//==========================================
-	int coinMap[6][100] = {};
-
 	const int kCoinMapHeight = 6;
 	const int kCoinMapWidth = 100;
 	const int kCoinMapSize = 64;
 	const float kCoinSize = 64.0f;
 
-	// コイン配置
-	const int coinPositions[][2] = {
-		{5,5}, {6,4}, {6,3}, {10,3},
-		{17,3}, {18,3}, {26,3}, {27,4},
-		{38,2}, {39,2}, {40,2},
-		{50,2}, {52,2}, {60,1}
+	// コイン配置マップ（1: コインあり, 0: コインなし）
+	int coinMap[kCoinMapHeight][kCoinMapWidth] = {
+		{ 0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
 	};
-
-	for (int i = 0;
-		i < static_cast<int>(
-			sizeof(coinPositions) / sizeof(coinPositions[0])
-			); i++) {
-
-		int x = coinPositions[i][0];
-		int y = coinPositions[i][1];
-
-		coinMap[y][x] = 1;
-	}
 
 	const int kMaxCoinStageSets = 100;
 
@@ -963,9 +952,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 		}
 				 break;
-		//==========================================
-		// 宇宙ボーナスステージ
-		//==========================================
+				 //==========================================
+				 // 宇宙ボーナスステージ
+				 //==========================================
 		case BonusStage: {
 
 			//==========================================
@@ -1369,7 +1358,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					);
 
 			for (int set = coinCollisionStageSet - 1;
-				set <= coinCollisionStageSet + 1; set++) {
+				set <= collisionStageSet + 1; set++) {
 
 				if (set < 0 || set >= kMaxCoinStageSets) {
 					continue;
@@ -1614,37 +1603,37 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			break;
 		}
+		}
+
+		//==========================================
+		// シーン切り替えフェードイン
+		//==========================================
+		if (scene != Title &&
+			gameFadeTimer < 60 &&
+			!isTransitioningToBonus &&
+			scene != BonusStage) {
+
+			int alpha =
+				255 - gameFadeTimer * 255 / 60;
+
+			Novice::DrawBox(
+				0, 0, 1280, 720,
+				0.0f,
+				static_cast<unsigned int>(alpha),
+				kFillModeSolid
+			);
+
+			gameFadeTimer++;
+		}
+
+		Novice::EndFrame();
+
+		if (preKeys[DIK_ESCAPE] == 0 &&
+			keys[DIK_ESCAPE] != 0 &&
+			scene != Title) {
+			break;
+		}
 	}
-
-	//==========================================
-	// シーン切り替えフェードイン
-	//==========================================
-	if (scene != Title &&
-		gameFadeTimer < 60 &&
-		!isTransitioningToBonus &&
-		scene != BonusStage) {
-
-		int alpha =
-			255 - gameFadeTimer * 255 / 60;
-
-		Novice::DrawBox(
-			0, 0, 1280, 720,
-			0.0f,
-			static_cast<unsigned int>(alpha),
-			kFillModeSolid
-		);
-
-		gameFadeTimer++;
-	}
-
-	Novice::EndFrame();
-
-	if (preKeys[DIK_ESCAPE] == 0 &&
-		keys[DIK_ESCAPE] != 0 &&
-		scene != Title) {
-		break;
-	}
-}
-Novice::Finalize();
-return 0;
+	Novice::Finalize();
+	return 0;
 }
