@@ -244,7 +244,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kCoinMapSize = 64;
 	const float kCoinSize = 64.0f;
 
-	// コイン配置マップ（1: コインあり, 0: コインなし）
+	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
 	int coinMap[kCoinMapHeight][kCoinMapWidth] = 
 	{
 		{ 0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
@@ -254,12 +254,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		{ 0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
 	};
+	//==========================================
+	// ボーナスステージ専用コインマップ
+	//==========================================
+	const int kBonusCoinMapHeight = 8;
+	const int kBonusCoinMapWidth = 100;
+	const int kBonusCoinMapSize = 64;
 
 	const int kMaxCoinStageSets = 100;
 
+	// 1ループは2560px、1マスは64pxなので40マス
+	const int kBonusCoinLoopTileCount = 40;
+	const float kBonusCoinLoopWidth = 2560.0f;
+
+	// ループごとにコインの取得状態を管理
+	bool bonusCoinCollected[kMaxBonusLoops]
+		[kBonusCoinMapHeight][kBonusCoinMapWidth] = {};
+
 	static bool coinCollectedByStage[kMaxCoinStageSets]
 		[kCoinMapHeight][kCoinMapWidth] = {};
-
+	int bonusCoinMap[kBonusCoinMapHeight][kBonusCoinMapWidth] =
+	{
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 },
+		{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0 }
+	};
 	// リトライ時にコインを復元するため、初期配置を保存
 	int initialCoinMap[kCoinMapHeight][kCoinMapWidth] = {};
 	memcpy(initialCoinMap, coinMap, sizeof(coinMap));
@@ -1003,6 +1027,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					for (int y = 0; y < kBonusMapHeight; y++) {
 						for (int x = 0; x < kBonusMapWidth; x++) {
 							bonusMap[y][x] = 0;
+							// ボーナスステージのコイン取得状態をリセット
+							memset(bonusCoinCollected, 0, sizeof(bonusCoinCollected));
 						}
 					}
 					// 1つのループパターン（40マス＝2560px）内での配置
@@ -1109,6 +1135,60 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				if (playerVelocityY > 12.0f) {
 					playerVelocityY = 12.0f;
+				}
+			}
+
+			//==========================================
+			// ボーナスステージのコイン判定
+			//==========================================
+			for (int loop = 0; loop < kMaxBonusLoops; loop++) {
+				for (int y = 0; y < kBonusCoinMapHeight; y++) {
+					for (int x = 0; x < kBonusCoinLoopTileCount; x++) {
+
+						// コインがなければスキップ
+						if (bonusCoinMap[y][x] != 1) {
+							continue;
+						}
+
+						// このループのコインを取得済みならスキップ
+						if (bonusCoinCollected[loop][y][x]) {
+							continue;
+						}
+
+						// コインのワールド座標
+						float coinX =
+							x * kBonusCoinMapSize
+							+ loop * kBonusCoinLoopWidth;
+
+						int coinY =
+							y * kBonusCoinMapSize;
+
+						// プレイヤーの座標
+						float playerLeft = player.worldLeftTop.posX;
+						float playerRight =
+							player.worldLeftTop.posX + player.size.posX;
+						float playerTop = player.worldLeftTop.posY;
+						float playerBottom =
+							player.worldLeftTop.posY + player.size.posY;
+
+						// 当たり判定
+						if (playerLeft < coinX + kBonusCoinMapSize &&
+							playerRight > coinX &&
+							playerTop < coinY + kBonusCoinMapSize &&
+							playerBottom > coinY) {
+
+							// このループのコインだけ取得済みにする
+							bonusCoinCollected[loop][y][x] = true;
+
+							coinCount++;
+
+							if (coinSound != -1) {
+								Novice::PlayAudio(
+									coinSound, false, 0.8f
+								);
+							}
+						}
+					}
 				}
 			}
 
@@ -1301,7 +1381,51 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					0.0f, WHITE
 				);
 			}
+			//==========================================
+			// ボーナスステージのコイン描画
+			//==========================================
+			for (int loop = 0; loop < kMaxBonusLoops; loop++) {
+				for (int y = 0; y < kBonusCoinMapHeight; y++) {
+					for (int x = 0; x < kBonusCoinLoopTileCount; x++) {
 
+						if (bonusCoinMap[y][x] != 1 || coin == -1) {
+							continue;
+						}
+
+						// 取得済みなら描画しない
+						if (bonusCoinCollected[loop][y][x]) {
+							continue;
+						}
+
+						// 当たり判定と同じワールド座標を使う
+						float worldX =
+							x * kBonusCoinMapSize
+							+ loop * kBonusCoinLoopWidth;
+
+						int worldY =
+							y * kBonusCoinMapSize;
+
+						// ワールド座標から画面座標へ変換
+						int screenX =
+							static_cast<int>(worldX - scrollValue);
+
+						int screenY =
+							static_cast<int>(worldY);
+
+						// 画面内のコインだけ描画
+						if (screenX + kBonusCoinMapSize >= 0 &&
+							screenX <= 1280) {
+
+							Novice::DrawSprite(
+								screenX,
+								screenY,
+								coin,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
+					}
+				}
+			}
 			//==========================================
 			// バッテリー描画
 			//==========================================
