@@ -1116,14 +1116,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				playerVelocityY = 0.0f;
 			}
 
-			// 燃料がある間の地面判定
-			if (!isOutOfFuel &&
-				player.worldLeftTop.posY >= kGroundY) {
-
-				player.worldLeftTop.posY = kGroundY;
-				playerVelocityY = 0.0f;
-			}
-
 			// 背景ループ幅 (2560px)
 			const float kLoopWidth = 2560.0f;
 
