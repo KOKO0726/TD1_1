@@ -111,6 +111,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 宇宙ペンギン
 	int universepengin =
 		Novice::LoadTexture("./Resources/images/universepengin.png");
+	// 宇宙ペンギン2 (バッテリー0時)
+	int universepengin2Texture =
+		Novice::LoadTexture("./Resources/images/universepengin2.png");
 	// 背景
 	int backgroundTexture =
 		Novice::LoadTexture("./Resources/images/iceBackGround.png");
@@ -1281,9 +1284,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			//==========================================
-			// 宇宙ペンギン描画
+			// 宇宙ペンギン描画 (バッテリー0時はuniversepengin2Textureを表示)
 			//==========================================
-			if (universepengin != -1) {
+			int drawUniversePenginTex = isOutOfFuel ? universepengin2Texture : universepengin;
+
+			if (drawUniversePenginTex != -1) {
 
 				Novice::DrawSpriteRect(
 					static_cast<int>(
@@ -1293,7 +1298,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					universeFrame * 128,
 					0,
 					128, 128,
-					universepengin,
+					drawUniversePenginTex,
 					1.0f / static_cast<float>(kUniverseFrameCount),
 					1.0f,
 					0.0f, WHITE
