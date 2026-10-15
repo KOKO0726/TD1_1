@@ -64,6 +64,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	bool isTransitioningFromBonus = false;
 	int bonusExitTransitionTimer = 0;
 
+	// ボーナスステージ用 マップチップ設定 (充電アイテム用)
+	const int kBonusMapHeight = 10;
+	const int kBonusMapWidth = 100;
+	const int kBonusTileSize = 64;
+	int bonusMap[kBonusMapHeight][kBonusMapWidth] = {};
+
+	// 背景ループごとの獲得フラグ (各ループ・各マス用)
+	const int kMaxBonusLoops = 10;
+	bool bonusItemCollected[kMaxBonusLoops][kBonusMapHeight][kBonusMapWidth] = {};
+
 	//==========================================
 	// ジャンプ
 	//==========================================
@@ -85,6 +95,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
+	// 電池
+	int chargingTexture =
+		Novice::LoadTexture("./Resources/images/charging.png");
 	// プレイヤー
 	int playerTexture =
 		Novice::LoadTexture("./Resources/images/pengin2.png");
@@ -923,6 +936,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					player.worldLeftTop.posY = 200.0f;
 					playerVelocityY = 0.0f;
 
+					// 充電アイテムの初期化
+					for (int y = 0; y < kBonusMapHeight; y++) {
+						for (int x = 0; x < kBonusMapWidth; x++) {
+							bonusMap[y][x] = 0;
+						}
+					}
+					// 1つのループパターン（40マス＝2560px）の中央付近(20マス目)に1個セット
+					bonusMap[3][20] = 1;
+
+					// 獲得フラグのリセット
+					for (int i = 0; i < kMaxBonusLoops; i++) {
+						for (int y = 0; y < kBonusMapHeight; y++) {
+							for (int x = 0; x < kBonusMapWidth; x++) {
+								bonusItemCollected[i][y][x] = false;
+							}
+						}
+					}
+
 					//==================================
 					// ★宇宙に入ったらfireを常時再生
 					//==================================
@@ -1033,6 +1064,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				playerVelocityY = 0.0f;
 			}
 
+			// 背景ループ幅 (2560px)
+			const float kLoopWidth = 2560.0f;
+
+			//==========================================
+			// 充電アイテムとの当たり判定（拾うと消滅）
+			//==========================================
+			for (int y = 0; y < kBonusMapHeight; y++) {
+				for (int x = 0; x < kBonusMapWidth; x++) {
+
+					if (bonusMap[y][x] != 1) {
+						continue;
+					}
+
+					float baseItemX = static_cast<float>(x * kBonusTileSize);
+					float itemY = static_cast<float>(y * kBonusTileSize);
+
+					for (int i = 0; i < kMaxBonusLoops; i++) {
+
+						// 既に獲得済みなら判定を行わない
+						if (bonusItemCollected[i][y][x]) {
+							continue;
+						}
+
+						float itemX = baseItemX + i * kLoopWidth;
+
+						if (player.worldLeftTop.posX < itemX + kBonusTileSize &&
+							player.worldLeftTop.posX + player.size.posX > itemX &&
+							player.worldLeftTop.posY < itemY + kBonusTileSize &&
+							player.worldLeftTop.posY + player.size.posY > itemY) {
+
+							// アイテム獲得フラグを立てて消す
+							bonusItemCollected[i][y][x] = true;
+
+							// バッテリー回復（1個分回復＝インデックスを減らす）
+							if (batteryFrame > 0) {
+								batteryFrame--;
+								batteryTimer = 0; // タイマーもリセット
+							}
+						}
+					}
+				}
+			}
+
 			//==========================================
 			// 宇宙ペンギンアニメーション
 			//==========================================
@@ -1056,8 +1130,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			if (scrollValue < 0.0f) {
 				scrollValue = 0.0f;
 			}
-
-			const float kLoopWidth = 2560.0f;
 
 			float loopScroll =
 				fmodf(scrollValue, kLoopWidth);
@@ -1094,6 +1166,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					universe2Texture,
 					1.0f, 1.0f, 0.0f, WHITE
 				);
+			}
+
+			//==========================================
+			// 充電アイテムの描画 (未獲得の物のみ描画)
+			//==========================================
+			for (int y = 0; y < kBonusMapHeight; y++) {
+				for (int x = 0; x < kBonusMapWidth; x++) {
+
+					if (bonusMap[y][x] == 1 && chargingTexture != -1) {
+						float baseItemX = static_cast<float>(x * kBonusTileSize);
+						int drawY = y * kBonusTileSize;
+
+						for (int i = 0; i < kMaxBonusLoops; i++) {
+
+							// 獲得済みなら描画しない
+							if (bonusItemCollected[i][y][x]) {
+								continue;
+							}
+
+							int drawX = static_cast<int>(baseItemX + i * kLoopWidth - scrollValue);
+
+							if (drawX + kBonusTileSize >= 0 && drawX <= 1280) {
+								Novice::DrawSprite(
+									drawX,
+									drawY,
+									chargingTexture,
+									1.0f, 1.0f, 0.0f, WHITE
+								);
+							}
+						}
+					}
+				}
 			}
 
 			//==========================================
