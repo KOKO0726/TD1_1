@@ -4,7 +4,8 @@
 
 const char kWindowTitle[] = "LC1D_12_タカハシ";
 
-enum GameShene {
+enum GameShene
+{
 	Title,
 	Game,
 	tutorial,
@@ -12,12 +13,14 @@ enum GameShene {
 	Clear
 };
 
-struct Vector2 {
+struct Vector2
+{
 	float posX = 0.0f;
 	float posY = 0.0f;
 };
 
-struct Box {
+struct Box 
+{
 	Vector2 worldLeftTop{};
 	Vector2 size{};
 	Vector2 position;
@@ -26,7 +29,8 @@ struct Box {
 	unsigned int color = WHITE;
 };
 
-int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
+{
 
 	Novice::Initialize(kWindowTitle, 1280, 720);
 
@@ -241,7 +245,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kCoinSize = 64.0f;
 
 	// コイン配置マップ（1: コインあり, 0: コインなし）
-	int coinMap[kCoinMapHeight][kCoinMapWidth] = {
+	int coinMap[kCoinMapHeight][kCoinMapWidth] = 
+	{
 		{ 0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
