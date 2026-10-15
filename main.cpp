@@ -45,7 +45,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
-
+	
 	//==========================================
 	// 宇宙ステージ
 	//==========================================
@@ -1307,12 +1307,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						firePlayHandle = -1;
 					}
 
-					// ★ボーナスステージのBGMを停止
+					// ボーナスステージのBGMを停止
 					if (bonusPlayHandle != -1) {
 						Novice::StopAudio(bonusPlayHandle);
 						bonusPlayHandle = -1;
-						Novice::PlayAudio(kStageHandle, true, 0.2f);
 					}
+
+					// 通常ステージのBGMを再生
+					if (kStageHandle != -1) {
+						stagePlayHandle =
+							Novice::PlayAudio(kStageHandle, true, 0.2f);
+					}
+
+					scene = Game;
+					isTransitioningFromBonus = false;
+					gameFadeTimer = 0;
 
 					scene = Game;
 					isTransitioningFromBonus = false;
