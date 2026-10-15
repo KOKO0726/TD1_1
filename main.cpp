@@ -8,7 +8,8 @@ enum GameShene {
 	Title,
 	Game,
 	tutorial,
-	BonusStage
+	BonusStage,
+	Clear
 };
 
 struct Vector2 {
@@ -45,7 +46,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
-	
+
 	//==========================================
 	// 宇宙ステージ
 	//==========================================
@@ -146,6 +147,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//看板
 	int signboard =
 		Novice::LoadTexture("./Resources/images/signboard.png");
+	int goalHouseTexture = Novice::LoadTexture("./Resources/images/goalSnowHouse.png");
+	int goalFlagTexture = Novice::LoadTexture("./Resources/images/goalFlag.png");
+	int clearTexture = Novice::LoadTexture("./Resources/images/kuria.png");
 
 	//==========================================
 	// 効果音
@@ -245,6 +249,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	static bool coinCollectedByStage[kMaxCoinStageSets]
 		[kCoinMapHeight][kCoinMapWidth] = {};
 
+	// リトライ時にコインを復元するため、初期配置を保存
+	int initialCoinMap[kCoinMapHeight][kCoinMapWidth] = {};
+	memcpy(initialCoinMap, coinMap, sizeof(coinMap));
+
+	// ゴール（200x200画像を等倍表示）
+	const float kGoalX = 4600.0f; // かまくら・旗・ゴール判定を200px手前へ
+	const float kGoalY = 300.0f;
+	bool isGameClear = false;
+	int goalTimer = 0;
+	int goalFlagFrame = 0;
+	int clearTimer = 0;
+	const int kGoalWaitFrames = 180;
+	const int kClearShowFrames = 420;
 	int coinCount = 0;
 
 	// 看板の配置数
@@ -669,7 +686,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				  //==========================================
 		case Game: {
 
-			if (!isTransitioningToBonus) {
+			if (!isTransitioningToBonus && !isGameClear) {
 				player.worldLeftTop.posX += kMoveSpeed;
 
 				if (keys[DIK_A]) {
@@ -694,7 +711,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			// 重力
-			if (isJumping) {
+			if (isJumping && !isGameClear) {
 				playerVelocityY += kGravity;
 				player.worldLeftTop.posY += playerVelocityY;
 			}
@@ -712,7 +729,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			// トランポリン
-			for (int i = 0; i < kTrampolineCount; i++) {
+			for (int i = 0; i < kTrampolineCount && !isGameClear; i++) {
 
 				float trampolineX =
 					trampolinePositions[i].posX;
@@ -751,7 +768,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 宇宙へ移動
 			//==========================================
 			if (player.worldLeftTop.posY < -100.0f &&
-				!isTransitioningToBonus) {
+				!isTransitioningToBonus && !isGameClear) {
 
 				isTransitioningToBonus = true;
 				bonusTransitionTimer = 0;
@@ -791,6 +808,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 								coinSound, false, 0.8f
 							);
 						}
+					}
+				}
+			}
+
+			// ゴール到達：ペンギンがかまくらに触れたら停止
+			if (!isGameClear && !isTransitioningToBonus &&
+				player.worldLeftTop.posX + player.size.posX > kGoalX &&
+				player.worldLeftTop.posX < kGoalX + 200.0f &&
+				player.worldLeftTop.posY + player.size.posY > kGoalY) {
+				isGameClear = true;
+				isJumping = false;
+				playerVelocityY = 0.0f;
+				goalTimer = 0;
+				goalFlagFrame = 0;
+			}
+			if (isGameClear) {
+				goalTimer++;
+				if (goalTimer % 8 == 0 && goalFlagFrame < 3) goalFlagFrame++;
+				if (goalTimer >= kGoalWaitFrames) {
+					scene = Clear;
+					clearTimer = 0;
+					if (stagePlayHandle != -1) {
+						Novice::StopAudio(stagePlayHandle);
+						stagePlayHandle = -1;
 					}
 				}
 			}
@@ -865,6 +906,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						);
 					}
 				}
+			}
+
+			// かまくらと旗（旗は192x48、48x48の4コマ）
+			if (goalHouseTexture != -1) {
+				Novice::DrawSprite(static_cast<int>(kGoalX - scrollValue),
+					static_cast<int>(kGoalY), goalHouseTexture, 1.0f, 1.0f, 0.0f, WHITE);
+			}
+			if (goalFlagTexture != -1) {
+				Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue),
+					static_cast<int>(kGoalY + 28.0f), goalFlagFrame * 48, 0,
+					48, 48, goalFlagTexture, 0.375f, 1.5f, 0.0f, WHITE);
 			}
 
 			// プレイヤー
@@ -1323,10 +1375,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					isTransitioningFromBonus = false;
 					gameFadeTimer = 0;
 
-					scene = Game;
-					isTransitioningFromBonus = false;
-					gameFadeTimer = 0;
-
 					player.worldLeftTop.posX =
 						savedPlayerX - 200.0f;
 
@@ -1348,6 +1396,62 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					   //==========================================
 					   // チュートリアル
 					   //==========================================
+		case Clear: {
+			clearTimer++;
+			if (clearTexture != -1) {
+				Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
+			}
+			else {
+				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
+				Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+			}
+			if (clearTimer >= kClearShowFrames) {
+				scene = Title;
+				timer = 0;
+				selectedMenu = 0;
+				isRuleOpen = false;
+				isTitleFading = false;
+				titleFadeTimer = 0;
+				title1Y = -180.0f;
+				title2Y = -250.0f;
+				title1Velocity = 0.0f;
+				title2Velocity = 0.0f;
+				penguinX = -200.0f;
+				penguinY = 380.0f;
+				player.worldLeftTop = { 10.0f, 500.0f };
+				playerVelocityY = 0.0f;
+				isJumping = false;
+				jumpCount = 0;
+				jumpFrame = 0;
+				jumpAnimationTimer = 0;
+				scrollValue = 0.0f;
+				gameFadeTimer = 0;
+				isGameClear = false;
+				goalTimer = 0;
+				goalFlagFrame = 0;
+				coinCount = 0;
+				memcpy(coinMap, initialCoinMap, sizeof(coinMap));
+				memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
+				memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
+				isTransitioningToBonus = false;
+				isTransitioningFromBonus = false;
+				bonusTransitionTimer = 0;
+				bonusExitTransitionTimer = 0;
+				batteryFrame = 0;
+				batteryTimer = 0;
+				if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
+				if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
+				if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+				if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
+			}
+			break;
+		}
+
+
+				  //==========================================
+				  // チュートリアル
+				  //==========================================
+
 		case tutorial: {
 
 			// 自動前進
@@ -1724,7 +1828,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		if (scene != Title &&
 			gameFadeTimer < 60 &&
 			!isTransitioningToBonus &&
-			scene != BonusStage) {
+			scene != BonusStage &&
+			scene != Clear) {
 
 			int alpha =
 				255 - gameFadeTimer * 255 / 60;
