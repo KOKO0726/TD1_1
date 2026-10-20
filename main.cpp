@@ -173,6 +173,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//星をすべて取った時の文字
 	int perfectTexture =
 		Novice::LoadTexture("./Resources/images/perfect.png");
+	//ライフの画像
+	int playerLifeTexture =
+		Novice::LoadTexture("./Resources/images/life.png");
 
 	//==========================================
 	// 敵（シャチ）の設定
@@ -1157,6 +1160,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
 			}
 			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
+
+			//==========================================
+			// ライフ描画（左上に3つ）
+			//==========================================
+			if (playerLifeTexture != -1) {
+				for (int i = 0; i < 3; i++) {
+					Novice::DrawSprite(
+						20 + i * 60, 20,  // 描画位置
+						playerLifeTexture,
+						0.5f, 0.5f,       // 画像の大きさ
+						0.0f, WHITE
+					);
+				}
+			}
 
 			//==========================================
 			// 宇宙へのフェードアウト
@@ -2245,9 +2262,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				);
 			}
 
-			Novice::ScreenPrintf(
-				20, 20, "COIN : %d", coinCount
-			);
+			// コイン画像と獲得枚数を右上に表示
+			if (coin != -1) {
+				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+			}
+			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
 
 			break;
 		}
