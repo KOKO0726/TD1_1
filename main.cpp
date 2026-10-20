@@ -100,6 +100,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	// 画像
 	//==========================================
+	int enemyTexture =
+		Novice::LoadTexture("./Resources/images/enemy.png");
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
@@ -171,6 +173,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//星をすべて取った時の文字
 	int perfectTexture =
 		Novice::LoadTexture("./Resources/images/perfect.png");
+
+	//==========================================
+	// 敵（シャチ）の設定
+	//==========================================
+	struct Enemy
+	{
+		Vector2 position;
+		Vector2 size;
+		float speed;
+		bool isActive;
+	};
+
+	Enemy enemy{};
+	enemy.size = { 128.0f, 64.0f };
+	enemy.speed = 15.0f; // 移動速度
+	enemy.position = { 1280.0f + 200.0f, 300.0f }; // 高さを上方向（Y=300）にし右外側からスタート
+	enemy.isActive = true;
 
 	//==========================================
 	// 効果音
@@ -771,6 +790,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
+			//==========================================
+			// スクロール計算（敵の更新で使うため先行計算）
+			//==========================================
+			scrollValue =
+				player.worldLeftTop.posX +
+				player.size.posX - scrollStartPositionX;
+
+			if (scrollValue < 0.0f) {
+				scrollValue = 0.0f;
+			}
+
+			//==========================================
+			// シャチ（敵）の更新処理
+			//==========================================
+			if (enemy.isActive && !isGameClear) {
+				// 右から左へ高速移動
+				enemy.position.posX -= enemy.speed;
+
+				// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
+				if (enemy.position.posX + enemy.size.posX < scrollValue) {
+					enemy.position.posX = scrollValue + 1280.0f + 200.0f;
+					enemy.position.posY = 300.0f;
+				}
+			}
+
 			// ジャンプアニメーション
 			if (isJumping) {
 
@@ -961,14 +1005,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			//==========================================
 			// スクロール
 			//==========================================
-			scrollValue =
-				player.worldLeftTop.posX +
-				player.size.posX - scrollStartPositionX;
-
-			if (scrollValue < 0.0f) {
-				scrollValue = 0.0f;
-			}
-
 			float loopScroll =
 				fmodf(scrollValue, kBackgroundWidth);
 
@@ -1075,6 +1111,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue),
 					static_cast<int>(kGoalY + 28.0f), goalFlagFrame * 48, 0,
 					48, 48, goalFlagTexture, 0.375f, 1.5f, 0.0f, WHITE);
+			}
+
+			// シャチ（敵）の描画
+			if (enemy.isActive && enemyTexture != -1) {
+				Novice::DrawSprite(
+					static_cast<int>(enemy.position.posX - scrollValue),
+					static_cast<int>(enemy.position.posY),
+					enemyTexture,
+					1.0f, 1.0f, 0.0f, WHITE
+				);
 			}
 
 			// プレイヤー
@@ -1823,6 +1869,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				player.worldLeftTop.posX -= 30.0f;
 			}
 
+			//==========================================
+			// スクロール計算（敵の更新で使うため先行計算）
+			//==========================================
+			scrollValue =
+				player.worldLeftTop.posX +
+				player.size.posX - scrollStartPositionX;
+
+			if (scrollValue < 0.0f) {
+				scrollValue = 0.0f;
+			}
+
+			// シャチ（敵）の更新処理
+			if (enemy.isActive) {
+				enemy.position.posX -= enemy.speed;
+
+				// 画像の右端が完全に画面の左外側（scrollValue）を出たら再出現
+				if (enemy.position.posX + enemy.size.posX < scrollValue) {
+					enemy.position.posX = scrollValue + 1280.0f + 200.0f;
+					enemy.position.posY = 300.0f;
+				}
+			}
+
 			// ジャンプ
 			if (preKeys[DIK_SPACE] == 0 &&
 				keys[DIK_SPACE] != 0 &&
@@ -1988,14 +2056,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			//==========================================
 			// スクロール
 			//==========================================
-			scrollValue =
-				player.worldLeftTop.posX +
-				player.size.posX - scrollStartPositionX;
-
-			if (scrollValue < 0.0f) {
-				scrollValue = 0.0f;
-			}
-
 			float loopScroll =
 				fmodf(scrollValue, kBackgroundWidth);
 
@@ -2144,6 +2204,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						}
 					}
 				}
+			}
+
+			// シャチ（敵）の描画
+			if (enemy.isActive && enemyTexture != -1) {
+				Novice::DrawSprite(
+					static_cast<int>(enemy.position.posX - scrollValue),
+					static_cast<int>(enemy.position.posY),
+					enemyTexture,
+					1.0f, 1.0f, 0.0f, WHITE
+				);
 			}
 
 			// プレイヤー
