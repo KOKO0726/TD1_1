@@ -46,11 +46,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	const float kMoveSpeed = 10.0f;
 	const float kStageWidth = 1280.0f * 4.0f;
-	const float kMaxScroll = kStageWidth - 1280.0f;
+	//const float kMaxScroll = kStageWidth - 1280.0f;
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
-
+	//==========================================
+	// ステージセット変数
+	//==========================================
+	int stageSet =static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 	//==========================================
 	// 宇宙ステージ
 	//==========================================
@@ -215,10 +218,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// トランポリン
 	//==========================================
 	Vector2 trampolinePositions[] = {
-		{ 500.0f, 500.0f },
-		{ 1000.0f, 500.0f },
-		{ 1500.0f, 500.0f },
-		{ 2200.0f, 500.0f }
+		{ 3000.0f, 500.0f },
+		{ 5000.0f, 500.0f }
 	};
 
 	const int kTrampolineCount =
@@ -247,11 +248,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
 	int coinMap[kCoinMapHeight][kCoinMapWidth] = 
 	{
-		{ 0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-		{ 0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-		{ 0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+		{ 0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
 	};
 	//==========================================
@@ -292,8 +293,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	memcpy(initialCoinMap, coinMap, sizeof(coinMap));
 
 	// ゴール（200x200画像を等倍表示）
-	const float kGoalX = 4600.0f; // かまくら・旗・ゴール判定を200px手前へ
-	const float kGoalY = 300.0f;
+	const float kGoalX = 30000.0f; // かまくら・旗・ゴール判定を200px手前へ
+	const float kGoalY = 350.0f;
 	bool isGameClear = false;
 	int goalTimer = 0;
 	int goalFlagFrame = 0;
@@ -509,7 +510,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						// ステージBGMを再生
 						if (kStageHandle != -1) {
 							stagePlayHandle =
-								Novice::PlayAudio(kStageHandle, true, 0.2f);
+								Novice::PlayAudio(kStageHandle, true, 1.0f);
 						}
 					}
 					else if (selectedMenu == 1) {
@@ -719,16 +720,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			break;
 		}
 
-				  //==========================================
-				  // 通常ゲーム
-				  //==========================================
-		case Game: {
+		 //==========================================
+		 // 通常ゲーム
+		 //==========================================
 
+		case Game: {
+			//==========================================
+			// 現在のステージセットを更新
+			//==========================================
+			stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
+
+			//==========================================
+			// 更新処理
+			//==========================================
 			if (!isTransitioningToBonus && !isGameClear) {
 				player.worldLeftTop.posX += kMoveSpeed;
 
 				if (keys[DIK_A]) {
-					player.worldLeftTop.posX -= 30.0f;
+					player.worldLeftTop.posX -= 30.0f;//デバック用
 				}
 
 				if (preKeys[DIK_SPACE] == 0 &&
@@ -748,25 +757,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			// 重力
-			if (isJumping && !isGameClear) {
-				playerVelocityY += kGravity;
-				player.worldLeftTop.posY += playerVelocityY;
-			}
-
 			// ジャンプアニメーション
 			if (isJumping) {
 
 				jumpAnimationTimer++;
 
 				if (jumpAnimationTimer >= 10) {
+
 					jumpAnimationTimer = 0;
 					jumpFrame =
 						(jumpFrame + 1) % kJumpFrameCount;
 				}
 			}
 
-			// トランポリン
+			
+
+			// 重力
+			if (isJumping) {
+
+				playerVelocityY += kGravity;
+				player.worldLeftTop.posY += playerVelocityY;
+			}
+
+			//==========================================
+			// トランポリン判定
+			//==========================================
 			for (int i = 0; i < kTrampolineCount && !isGameClear; i++) {
 
 				float trampolineX =
@@ -822,29 +837,62 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				jumpCount = 0;
 			}
 
+			//==========================================
 			// コイン判定
-			for (int y = 0; y < kCoinMapHeight; y++) {
-				for (int x = 0; x < kCoinMapWidth; x++) {
+			//==========================================
+			int collisionStageSet =
+				static_cast<int>(
+					player.worldLeftTop.posX / kStageWidth
+					);
+			int coinCollisionStageSet =
+				static_cast<int>(
+					player.worldLeftTop.posX / kStageWidth
+					);
 
-					if (coinMap[y][x] != 1) {
-						continue;
-					}
+			for (int set = coinCollisionStageSet - 1;
+				set <= collisionStageSet + 1; set++) {
 
-					float coinX = static_cast<float>(x * kCoinMapSize);
-					float coinY = static_cast<float>(y * kCoinMapSize);
+				if (set < 0 || set >= kMaxCoinStageSets) {
+					continue;
+				}
 
-					if (player.worldLeftTop.posX < coinX + kCoinSize &&
-						player.worldLeftTop.posX + player.size.posX > coinX &&
-						player.worldLeftTop.posY < coinY + kCoinSize &&
-						player.worldLeftTop.posY + player.size.posY > coinY) {
+				for (int y = 0; y < kCoinMapHeight; y++) {
+					for (int x = 0; x < kCoinMapWidth; x++) {
 
-						coinMap[y][x] = 0;
-						coinCount++;
+						if (coinMap[y][x] != 1 ||
+							coinCollectedByStage[set][y][x]) {
+							continue;
+						}
 
-						if (coinSound != -1) {
-							Novice::PlayAudio(
-								coinSound, false, 0.8f
-							);
+						float coinX =
+							x * kCoinMapSize + set * kStageWidth;
+
+						float coinY =
+							static_cast<float>(y * kCoinMapSize);
+
+						float playerRight =
+							player.worldLeftTop.posX +
+							player.size.posX;
+
+						float playerBottom =
+							player.worldLeftTop.posY +
+							player.size.posY;
+
+						if (player.worldLeftTop.posX <
+							coinX + kCoinSize &&
+							playerRight > coinX &&
+							player.worldLeftTop.posY <
+							coinY + kCoinSize &&
+							playerBottom > coinY) {
+
+							coinCollectedByStage[set][y][x] = true;
+							coinCount++;
+
+							if (coinSound != -1) {
+								Novice::PlayAudio(
+									coinSound, false, 0.2f
+								);
+							}
 						}
 					}
 				}
@@ -879,14 +927,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				player.worldLeftTop.posX = 0.0f;
 			}
 
+			// ゴールより先に進めないようにする
 			if (player.worldLeftTop.posX >
-				kStageWidth - player.size.posX) {
+				kGoalX + 200.0f - player.size.posX) {
 
 				player.worldLeftTop.posX =
-					kStageWidth - player.size.posX;
+					kGoalX + 200.0f - player.size.posX;
 			}
 
+			//==========================================
 			// スクロール
+			//==========================================
 			scrollValue =
 				player.worldLeftTop.posX +
 				player.size.posX - scrollStartPositionX;
@@ -895,9 +946,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				scrollValue = 0.0f;
 			}
 
-			if (scrollValue > kMaxScroll) {
-				scrollValue = kMaxScroll;
+			float loopScroll =
+				fmodf(scrollValue, kBackgroundWidth);
+
+			// 背景
+			for (int i = 0; i < 8; i++) {
+
+				int textureIndex = i % 4;
+
+				float backgroundX =
+					1280.0f * i - loopScroll;
+
+				if (textureIndex >= 0 &&
+					backgroundTexture != -1) {
+
+					Novice::DrawSprite(
+						static_cast<int>(backgroundX),
+						0,
+						backgroundTexture,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
+				}
 			}
+
+				static_cast<int>(
+					player.worldLeftTop.posX / kStageWidth
+					);
 
 			// 背景
 			for (int i = 0; i < 4; i++) {
@@ -911,7 +985,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					);
 				}
 			}
-
+			
 			// トランポリン描画
 			for (int i = 0; i < kTrampolineCount; i++) {
 
@@ -930,18 +1004,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 
 			// コイン描画
-			for (int y = 0; y < kCoinMapHeight; y++) {
-				for (int x = 0; x < kCoinMapWidth; x++) {
+			for (int set = stageSet - 1;
+				set <= stageSet + 1; set++) {
 
-					if (coinMap[y][x] == 1 && coin != -1) {
-						Novice::DrawSprite(
-							static_cast<int>(
-								x * kCoinMapSize - scrollValue
-								),
-							y * kCoinMapSize,
-							coin,
-							1.0f, 1.0f, 0.0f, WHITE
-						);
+				if (set < 0 || set >= kMaxCoinStageSets) {
+					continue;
+				}
+
+				for (int y = 0; y < kCoinMapHeight; y++) {
+					for (int x = 0; x < kCoinMapWidth; x++) {
+
+						if (coinMap[y][x] != 1 ||
+							coinCollectedByStage[set][y][x]) {
+							continue;
+						}
+
+						float coinX =
+							x * kCoinMapSize +
+							set * kStageWidth;
+
+						int screenX =
+							static_cast<int>(coinX - scrollValue);
+
+						if (screenX + kCoinSize < 0 ||
+							screenX > 1280) {
+							continue;
+						}
+
+						if (coin != -1) {
+							Novice::DrawSprite(
+								screenX,
+								y * kCoinMapSize,
+								coin,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
 					}
 				}
 			}
@@ -1065,21 +1162,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// ボーナスステージのBGMを再生
 					if (kBonusHandle != -1) {
 						bonusPlayHandle =
-							Novice::PlayAudio(kBonusHandle, true, 0.2f);
+							Novice::PlayAudio(kBonusHandle, true, 0.5f);
 					}
 
 					// ロケットの噴射音を再生
 					if (fireSound != -1) {
 						firePlayHandle =
-							Novice::PlayAudio(fireSound, true, 0.2f);
+							Novice::PlayAudio(fireSound, true, 1.0f);
 					}
 				}
 			}
 		}
 				 break;
-				 //==========================================
-				 // 宇宙ボーナスステージ
-				 //==========================================
+
+		 //==========================================
+		 // 宇宙ボーナスステージ
+		 //==========================================
 		case BonusStage: {
 
 			//==========================================
@@ -1187,7 +1285,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 							if (coinSound != -1) {
 								Novice::PlayAudio(
-									coinSound, false, 0.8f
+									coinSound, false, 0.1f
 								);
 							}
 						}
@@ -1525,7 +1623,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// 通常ステージのBGMを再生
 					if (kStageHandle != -1) {
 						stagePlayHandle =
-							Novice::PlayAudio(kStageHandle, true, 0.2f);
+							Novice::PlayAudio(kStageHandle, true, 1.0f);
 					}
 
 					scene = Game;
@@ -1550,9 +1648,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			break;
 		}
 
-					   //==========================================
-					   // チュートリアル
-					   //==========================================
+		//==========================================
+		// クリア
+		//==========================================
 		case Clear: {
 			clearTimer++;
 			if (clearTexture != -1) {
@@ -1605,12 +1703,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		}
 
 
-				  //==========================================
-				  // チュートリアル
-				  //==========================================
+		//==========================================
+		// チュートリアル
+		//==========================================
 
 		case tutorial: {
-
+			//==========================================
+			// 現在のステージセットを更新
+			//==========================================
+			stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
+			//==========================================
+			// 更新処理
+			// =========================================
+			
 			// 自動前進
 			player.worldLeftTop.posX += kMoveSpeed;
 
@@ -1814,10 +1919,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			int stageSet =
-				static_cast<int>(
-					player.worldLeftTop.posX / kStageWidth
-					);
+			//================================
+			//チュートリアル描画処理
+			//================================
 
 			// トランポリン描画
 			for (int set = stageSet - 1;
