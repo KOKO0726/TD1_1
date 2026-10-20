@@ -19,7 +19,7 @@ struct Vector2
 	float posY = 0.0f;
 };
 
-struct Box 
+struct Box
 {
 	Vector2 worldLeftTop{};
 	Vector2 size{};
@@ -53,7 +53,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	// ステージセット変数
 	//==========================================
-	int stageSet =static_cast<int>(player.worldLeftTop.posX / kStageWidth);
+	int stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 	//==========================================
 	// 宇宙ステージ
 	//==========================================
@@ -163,6 +163,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int goalHouseTexture = Novice::LoadTexture("./Resources/images/goalSnowHouse.png");
 	int goalFlagTexture = Novice::LoadTexture("./Resources/images/goalFlag.png");
 	int clearTexture = Novice::LoadTexture("./Resources/images/kuria.png");
+	//星
+	int starTexture =
+		Novice::LoadTexture("./Resources/images/star.png");
+	int noStarTexture =
+		Novice::LoadTexture("./Resources/images/noStar.png");
+	//星をすべて取った時の文字
+	int perfectTexture =
+		Novice::LoadTexture("./Resources/images/perfect.png");
 
 	//==========================================
 	// 効果音
@@ -246,7 +254,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const float kCoinSize = 64.0f;
 
 	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
-	int coinMap[kCoinMapHeight][kCoinMapWidth] = 
+	int coinMap[kCoinMapHeight][kCoinMapWidth] =
 	{
 		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
@@ -302,6 +310,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kGoalWaitFrames = 180;
 	const int kClearShowFrames = 420;
 	int coinCount = 0;
+	//星の管理変数
+	bool hasVisitedBonus = false;
+	bool hasTakenDamage = false;
+
+	bool starConditions[4] = {};
+	int starCount = 0;
 
 	// 看板の配置数
 	const int kSignboardCount =
@@ -720,9 +734,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			break;
 		}
 
-		 //==========================================
-		 // 通常ゲーム
-		 //==========================================
+				  //==========================================
+				  // 通常ゲーム
+				  //==========================================
 
 		case Game: {
 			//==========================================
@@ -770,7 +784,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			
+
 
 			// 重力
 			if (isJumping) {
@@ -904,6 +918,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				player.worldLeftTop.posX < kGoalX + 200.0f &&
 				player.worldLeftTop.posY + player.size.posY > kGoalY) {
 				isGameClear = true;
+				// ゴール時に4つの星の条件を確定
+				starConditions[0] = true;
+				starConditions[1] = hasVisitedBonus;
+				starConditions[2] = coinCount >= 400;
+				starConditions[3] = !hasTakenDamage;
+				starCount = 0;
+				for (int i = 0; i < 4; i++) {
+					if (starConditions[i]) starCount++;
+				}
 				isJumping = false;
 				playerVelocityY = 0.0f;
 				goalTimer = 0;
@@ -969,9 +992,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-				static_cast<int>(
-					player.worldLeftTop.posX / kStageWidth
-					);
+			static_cast<int>(
+				player.worldLeftTop.posX / kStageWidth
+				);
 
 			// 背景
 			for (int i = 0; i < 4; i++) {
@@ -985,7 +1008,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					);
 				}
 			}
-			
+
 			// トランポリン描画
 			for (int i = 0; i < kTrampolineCount; i++) {
 
@@ -1083,9 +1106,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				);
 			}
 
-			Novice::ScreenPrintf(
-				20, 20, "COIN : %d", coinCount
-			);
+			// コイン画像と獲得枚数を右上に表示
+			if (coin != -1) {
+				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+			}
+			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
 
 			//==========================================
 			// 宇宙へのフェードアウト
@@ -1111,6 +1136,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				if (bonusTransitionTimer >= kMaxTransitionTime) {
 
 					scene = BonusStage;
+					hasVisitedBonus = true;
 					isTransitioningToBonus = false;
 					bonusTransitionTimer = 0;
 
@@ -1175,9 +1201,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		}
 				 break;
 
-		 //==========================================
-		 // 宇宙ボーナスステージ
-		 //==========================================
+				 //==========================================
+				 // 宇宙ボーナスステージ
+				 //==========================================
 		case BonusStage: {
 
 			//==========================================
@@ -1343,6 +1369,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								}
 							}
 							else if (bonusMap[y][x] == 2) {
+								hasTakenDamage = true;
 								// ダメージ電池: バッテリー2個分減少
 								batteryFrame += 2;
 								if (batteryFrame >= kBatteryFrameCount - 1) {
@@ -1645,12 +1672,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
+			// コイン画像と獲得枚数を右上に表示
+			if (coin != -1) {
+				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+			}
+			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
 			break;
 		}
 
-		//==========================================
-		// クリア
-		//==========================================
+					   //==========================================
+					   // クリア
+					   //==========================================
 		case Clear: {
 			clearTimer++;
 			if (clearTexture != -1) {
@@ -1659,6 +1691,70 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			else {
 				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
 				Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+			}
+			// クリア画面にも獲得コインを表示
+			if (coin != -1) {
+				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+			}
+			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
+			// 星が20フレームごとに1個ずつ飛び出す演出
+			const int kStarInterval = 20;
+			const int kStarSize = 180; // star.png / noStar.png の画像サイズ
+			const float kStarFinalScale = 0.9f;
+			for (int i = 0; i < 4; i++) {
+				int starElapsed = clearTimer - (i + 1) * kStarInterval;
+				if (starElapsed < 0) continue;
+
+				int texture = starConditions[i] ? starTexture : noStarTexture;
+				if (texture == -1) continue;
+
+				// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
+				float scale = kStarFinalScale;
+				if (starElapsed < 8) {
+					scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
+				}
+				else if (starElapsed < 16) {
+					scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
+				}
+
+				// 拡大・縮小しても星の中心位置が動かないようにする
+				int centerX = 325 + i * 210;
+				int centerY = 480;
+				int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
+				int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
+				Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
+
+				// 星の下に獲得条件を表示
+				const char* starLabels[4] = {
+					"GOAL", "BONUS", "COIN 400", "NO DAMAGE"
+				};
+				const int labelWidth[4] = { 4, 5, 8, 9 };
+				int labelX = centerX - labelWidth[i] * 4;
+				Novice::ScreenPrintf(labelX, 585, "%s", starLabels[i]);
+				Novice::ScreenPrintf(centerX - 12, 605, "%s",
+					starConditions[i] ? "OK" : "NG");
+			}
+			if (clearTimer >= 4 * kStarInterval + 16) {
+				Novice::ScreenPrintf(570, 650, "STAR : %d / 4", starCount);
+			}
+			// 4つの星をすべて獲得したときだけPERFECTを表示
+			// 4つ目の星の登場アニメーションが終わってから表示
+			if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
+				int perfectElapsed = clearTimer - 110;
+				float perfectScale = 1.0f;
+				if (perfectElapsed < 10) {
+					perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
+				}
+				else if (perfectElapsed < 20) {
+					perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+				}
+				// perfect.png は400x200。上部中央に表示
+				const int perfectWidth = 400;
+				const int perfectHeight = 200;
+				int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
+				int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
+				Novice::DrawSprite(perfectX, perfectY, perfectTexture,
+					perfectScale, perfectScale, 0.0f, WHITE);
 			}
 			if (clearTimer >= kClearShowFrames) {
 				scene = Title;
@@ -1685,6 +1781,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				goalTimer = 0;
 				goalFlagFrame = 0;
 				coinCount = 0;
+				hasVisitedBonus = false;
+				hasTakenDamage = false;
+				starCount = 0;
+				memset(starConditions, 0, sizeof(starConditions));
 				memcpy(coinMap, initialCoinMap, sizeof(coinMap));
 				memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
 				memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
@@ -1703,9 +1803,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		}
 
 
-		//==========================================
-		// チュートリアル
-		//==========================================
+				  //==========================================
+				  // チュートリアル
+				  //==========================================
 
 		case tutorial: {
 			//==========================================
@@ -1715,7 +1815,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			//==========================================
 			// 更新処理
 			// =========================================
-			
+
 			// 自動前進
 			player.worldLeftTop.posX += kMoveSpeed;
 
