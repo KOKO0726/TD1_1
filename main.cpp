@@ -29,6 +29,17 @@ struct Box
 	unsigned int color = WHITE;
 };
 
+// コイン取得時のパーティクル
+struct Particle
+{
+	Vector2 position;
+	Vector2 velocity;
+	int timer;
+	int lifeTime;
+	float radius;
+	bool isActive;
+};
+
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 {
 
@@ -270,10 +281,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	Vector2 signboardPositions[] =
 	{
-		{ 350.0f, 500.0f },
-		{ 850.0f, 500.0f },
-		{ 1350.0f, 500.0f },
-		{ 2050.0f, 500.0f },
+		{ 2900.0f, 500.0f },
+		{ 4900.0f, 500.0f },
 	};
 	//==========================================
 	// コイン
@@ -293,6 +302,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		{ 0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
 		{ 0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
 	};
+	//==========================================
+	// コインパーティクル
+	//==========================================
+	const int kMaxParticles = 40;
+	Particle particles[kMaxParticles]{};
+
+	const int kParticleLifeTime = 40;
+
+	// コイン取得時の光の輪
+	bool isCoinRingActive = false;
+	float coinRingX = 0.0f;
+	float coinRingY = 0.0f;
+	float coinRingRadius = 0.0f;
+	int coinRingTimer = 0;
+
+	// 光の輪の設定
+	const int kCoinRingLifeTime = 12;
+	const float kCoinRingMaxRadius = 60.0f;
 	//==========================================
 	// ボーナスステージ専用コインマップ
 	//==========================================
@@ -958,6 +985,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							coinCollectedByStage[set][y][x] = true;
 							coinCount++;
 
+							// コインを取った場所から黄色い粒を発生
+							for (int i = 0; i < kMaxParticles; i++)
+							{
+								if (!particles[i].isActive)
+								{
+									float coinCenterX = coinX + kCoinSize / 2.0f;
+									float coinCenterY = coinY + kCoinSize / 2.0f;
+
+									float angle =
+										(6.2831853f / kMaxParticles) * i;
+
+									particles[i].position = {
+										coinCenterX,
+										coinCenterY
+									};
+
+									// 粒子の飛ぶ速さを上げる
+									particles[i].velocity.posX = cosf(angle) * 8.0f;
+									particles[i].velocity.posY = sinf(angle) * 8.0f;
+
+									particles[i].timer = 0;
+									particles[i].lifeTime = kParticleLifeTime;
+									particles[i].radius = 5.0f;
+									particles[i].isActive = true;
+
+									break;
+								}
+							}
+
 							if (coinSound != -1) {
 								Novice::PlayAudio(
 									coinSound, false, 0.2f
@@ -1019,6 +1075,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			//==========================================
 			float loopScroll =
 				fmodf(scrollValue, kBackgroundWidth);
+
+			//=================================
+			// パーティクル更新
+			//=================================
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					particles[i].position.posX +=
+						particles[i].velocity.posX;
+
+					particles[i].position.posY +=
+						particles[i].velocity.posY;
+
+					// 少しずつ減速
+					particles[i].velocity.posX *= 0.95f;
+					particles[i].velocity.posY *= 0.95f;
+
+					// 少しずつ小さくする
+					particles[i].radius *= 0.96f;
+
+					particles[i].timer++;
+
+					if (particles[i].timer >= particles[i].lifeTime)
+					{
+						particles[i].isActive = false;
+					}
+				}
+			}
+
+			//==========================================
+			//描画処理
+			//==========================================
 
 			// 背景
 			for (int i = 0; i < 8; i++) {
@@ -1111,6 +1200,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							);
 						}
 					}
+				}
+			}
+
+			// 黄色いコイン用パーティクル描画
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					float screenX =
+						particles[i].position.posX - scrollValue;
+					float screenY =
+						particles[i].position.posY;
+
+					// 外側の光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)(particles[i].radius * 2.0f),
+						(int)(particles[i].radius * 2.0f),
+						0,
+						0xFFAA00FF,
+						kFillModeSolid
+					);
+
+					// 内側の黄色い光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)particles[i].radius,
+						(int)particles[i].radius,
+						0,
+						0xFFFF00FF,
+						kFillModeSolid
+					);
 				}
 			}
 
@@ -1402,6 +1525,44 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 							coinCount++;
 
+							// コインを取った場所から黄色い粒を発生
+							for (int i = 0; i < kMaxParticles; i++)
+							{
+								if (!particles[i].isActive)
+								{
+									float coinCenterX = coinX + kCoinSize / 2.0f;
+									float coinCenterY = coinY + kCoinSize / 2.0f;
+
+									float angle =
+										(6.2831853f / kMaxParticles) * i;
+
+									particles[i].position = {
+										coinCenterX,
+										coinCenterY
+									};
+
+									particles[i].velocity = {
+										cosf(angle) * 5.0f,
+										sinf(angle) * 5.0f
+									};
+
+									particles[i].timer = 0;
+									particles[i].lifeTime = kParticleLifeTime;
+									particles[i].radius = 5.0f;
+									particles[i].isActive = true;
+
+									break;
+								}
+							}
+							// 光の輪を発生させる
+							isCoinRingActive = true;
+
+							coinRingX = coinX + kCoinSize / 2.0f;
+							coinRingY = coinY + kCoinSize / 2.0f;
+
+							coinRingRadius = 5.0f;
+							coinRingTimer = 0;
+
 							if (coinSound != -1) {
 								Novice::PlayAudio(
 									coinSound, false, 0.1f
@@ -1409,6 +1570,53 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							}
 						}
 					}
+				}
+			}
+
+			//=================================
+			// パーティクル更新
+			//=================================
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					particles[i].position.posX +=
+						particles[i].velocity.posX;
+
+					particles[i].position.posY +=
+						particles[i].velocity.posY;
+
+					// 少しずつ減速
+					particles[i].velocity.posX *= 0.95f;
+					particles[i].velocity.posY *= 0.95f;
+
+					// 少しずつ小さくする
+					particles[i].radius *= 0.96f;
+
+					particles[i].timer++;
+
+					if (particles[i].timer >= particles[i].lifeTime)
+					{
+						particles[i].isActive = false;
+					}
+				}
+			}
+			// 光の輪の更新
+			if (isCoinRingActive)
+			{
+				coinRingTimer++;
+
+				// 0.0f から 1.0f まで変化する
+				float progress =
+					(float)coinRingTimer / kCoinRingLifeTime;
+
+				// 時間とともに輪を大きくする
+				coinRingRadius = kCoinRingMaxRadius * progress;
+
+				// 12フレーム経過したら消す
+				if (coinRingTimer >= kCoinRingLifeTime)
+				{
+					isCoinRingActive = false;
 				}
 			}
 
@@ -1654,6 +1862,64 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 			}
+
+			// 黄色いコイン用パーティクル描画
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					float screenX =
+						particles[i].position.posX - scrollValue;
+					float screenY =
+						particles[i].position.posY;
+
+					// 外側の光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)(particles[i].radius * 2.0f),
+						(int)(particles[i].radius * 2.0f),
+						0,
+						0xFFAA00FF,
+						kFillModeSolid
+					);
+
+					// 内側の黄色い光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)particles[i].radius,
+						(int)particles[i].radius,
+						0,
+						0xFFFF00FF,
+						kFillModeSolid
+					);
+				}
+			}
+			// コイン取得時の大きな光の輪
+			if (isCoinRingActive)
+			{
+				float progress =
+					(float)coinRingTimer / kCoinRingLifeTime;
+
+				int alpha = (int)(255.0f * (1.0f - progress));
+
+				unsigned int ringColor =
+					0xFFFF80FF & 0xFFFFFF00;
+
+				ringColor |= (unsigned int)alpha;
+
+				Novice::DrawEllipse(
+					(int)(coinRingX - scrollValue),
+					(int)coinRingY,
+					(int)coinRingRadius,
+					(int)coinRingRadius,
+					0.0f,
+					ringColor,
+					kFillModeWireFrame
+				);
+			}
+
 			//==========================================
 			// バッテリー描画
 			//==========================================
@@ -2103,6 +2369,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							coinCollectedByStage[set][y][x] = true;
 							coinCount++;
 
+							// コインを取った場所から黄色い粒を発生
+							for (int i = 0; i < kMaxParticles; i++)
+							{
+								if (!particles[i].isActive)
+								{
+									float coinCenterX = coinX + kCoinSize / 2.0f;
+									float coinCenterY = coinY + kCoinSize / 2.0f;
+
+									float angle =
+										(6.2831853f / kMaxParticles) * i;
+
+									particles[i].position = {
+										coinCenterX,
+										coinCenterY
+									};
+
+									particles[i].velocity = {
+										cosf(angle) * 5.0f,
+										sinf(angle) * 5.0f
+									};
+
+									particles[i].timer = 0;
+									particles[i].lifeTime = kParticleLifeTime;
+									particles[i].radius = 5.0f;
+									particles[i].isActive = true;
+
+									break;
+								}
+							}
+
 							if (coinSound != -1) {
 								Novice::PlayAudio(
 									coinSound, false, 0.8f
@@ -2139,8 +2435,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
+			//=================================
+			// パーティクル更新
+			//=================================
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					particles[i].position.posX +=
+						particles[i].velocity.posX;
+
+					particles[i].position.posY +=
+						particles[i].velocity.posY;
+
+					// 少しずつ減速
+					particles[i].velocity.posX *= 0.95f;
+					particles[i].velocity.posY *= 0.95f;
+
+					// 少しずつ小さくする
+					particles[i].radius *= 0.96f;
+
+					particles[i].timer++;
+
+					if (particles[i].timer >= particles[i].lifeTime)
+					{
+						particles[i].isActive = false;
+					}
+				}
+			}
+
+			//================================
 			//================================
 			//チュートリアル描画処理
+			//================================
 			//================================
 
 			// トランポリン描画
@@ -2263,6 +2590,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							);
 						}
 					}
+				}
+			}
+
+			// 黄色いコイン用パーティクル描画
+			for (int i = 0; i < kMaxParticles; i++)
+			{
+				if (particles[i].isActive)
+				{
+					float screenX =
+						particles[i].position.posX - scrollValue;
+					float screenY =
+						particles[i].position.posY;
+
+					// 外側の光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)(particles[i].radius * 2.0f),
+						(int)(particles[i].radius * 2.0f),
+						0,
+						0xFFAA00FF,
+						kFillModeSolid
+					);
+
+					// 内側の黄色い光
+					Novice::DrawEllipse(
+						(int)screenX,
+						(int)screenY,
+						(int)particles[i].radius,
+						(int)particles[i].radius,
+						0,
+						0xFFFF00FF,
+						kFillModeSolid
+					);
 				}
 			}
 
