@@ -38,6 +38,7 @@ struct Particle
 	int lifeTime;
 	float radius;
 	bool isActive;
+	unsigned int color = 0xFFFF00FF; // 初期色：黄色
 };
 
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
@@ -906,6 +907,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					playerVelocityY = -kTrampolineBouncePower;
 					isJumping = true;
 
+					// トランポリンを踏んだ場所から粒を飛ばす
+					float particleCenterX =
+						trampolineX + kTrampolineWidth / 2.0f;
+
+					float particleCenterY = trampolineY;
+
+					int spawnedCount = 0;
+
+					for (int p = 0; p < kMaxParticles; p++)
+					{
+						if (!particles[p].isActive)
+						{
+							// 左右に広がりながら上に飛ぶ
+							float angle =
+								3.1415926f +
+								(3.1415926f / 7.0f) * spawnedCount;
+
+							particles[p].position = {
+								particleCenterX,
+								particleCenterY
+							};
+
+							particles[p].velocity = {
+								cosf(angle) * 6.0f,
+								sinf(angle) * 6.0f
+							};
+
+							particles[p].timer = 0;
+							particles[p].lifeTime = 18;
+							particles[p].radius = 6.0f;
+							particles[p].color = 0xA0A0A0FF; // 灰色
+							particles[p].isActive = true;
+
+							spawnedCount++;
+
+							if (spawnedCount >= 8)
+							{
+								break;
+							}
+						}
+					}
+
 					if (trampolineSound != -1) {
 						Novice::PlayAudio(
 							trampolineSound, false, 0.8f
@@ -1009,6 +1052,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 									particles[i].timer = 0;
 									particles[i].lifeTime = kParticleLifeTime;
 									particles[i].radius = 5.0f;
+									particles[i].color = 0xFFFF00FF; // コイン用は黄色に戻す
 									particles[i].isActive = true;
 
 									break;
@@ -1204,6 +1248,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
+
 			// 黄色いコイン用パーティクル描画
 			for (int i = 0; i < kMaxParticles; i++)
 			{
@@ -1214,7 +1259,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					float screenY =
 						particles[i].position.posY;
 
-					// 外側の光
+					// 外側
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
@@ -1225,14 +1270,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						kFillModeSolid
 					);
 
-					// 内側の黄色い光
+					// 内側
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
 						(int)particles[i].radius,
 						(int)particles[i].radius,
 						0,
-						0xFFFF00FF,
+						particles[i].color,
 						kFillModeSolid
 					);
 				}
@@ -1525,7 +1570,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							bonusCoinCollected[loop][y][x] = true;
 
 							coinCount++;
-
 							// コインを取った場所から黄色い粒を発生
 							for (int i = 0; i < kMaxParticles; i++)
 							{
@@ -1550,6 +1594,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 									particles[i].timer = 0;
 									particles[i].lifeTime = kParticleLifeTime;
 									particles[i].radius = 5.0f;
+									particles[i].color = 0xFFFF00FF; // コイン用は黄色に戻す
 									particles[i].isActive = true;
 
 									break;
@@ -1875,7 +1920,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					float screenY =
 						particles[i].position.posY;
 
-					// 外側の光
+					// 外側
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
@@ -1886,14 +1931,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						kFillModeSolid
 					);
 
-					// 内側の黄色い光
+					// 内側
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
 						(int)particles[i].radius,
 						(int)particles[i].radius,
 						0,
-						0xFFFF00FF,
+						particles[i].color,
 						kFillModeSolid
 					);
 				}
@@ -2304,6 +2349,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						playerVelocityY =
 							-kTrampolineBouncePower;
 
+						// トランポリンを踏んだ場所から粒を飛ばす
+						float particleCenterX =
+							trampolineX + kTrampolineWidth / 2.0f;
+
+						float particleCenterY = trampolineY;
+
+						int spawnedCount = 0;
+
+						for (int p = 0; p < kMaxParticles; p++)
+						{
+							if (!particles[p].isActive)
+							{
+								// 左右に広がりながら上に飛ぶ
+								float angle =
+									3.1415926f +
+									(3.1415926f / 7.0f) * spawnedCount;
+
+								particles[p].position = {
+									particleCenterX,
+									particleCenterY
+								};
+
+								particles[p].velocity = {
+									cosf(angle) * 6.0f,
+									sinf(angle) * 6.0f
+								};
+
+								particles[p].timer = 0;
+								particles[p].lifeTime = 18;
+								particles[p].radius = 6.0f;
+								particles[p].color = 0xA0A0A0FF; // 灰色
+								particles[p].isActive = true;
+
+								spawnedCount++;
+
+								if (spawnedCount >= 8)
+								{
+									break;
+								}
+							}
+						}
+
 						isJumping = true;
 
 						if (trampolineSound != -1) {
@@ -2606,7 +2693,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					float screenY =
 						particles[i].position.posY;
 
-					// 外側の光
+					// 外側の光：パーティクルに設定された色
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
@@ -2617,14 +2704,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						kFillModeSolid
 					);
 
-					// 内側の黄色い光
+					// 内側の光：同じ色
 					Novice::DrawEllipse(
 						(int)screenX,
 						(int)screenY,
 						(int)particles[i].radius,
 						(int)particles[i].radius,
 						0,
-						0xFFFF00FF,
+						particles[i].color,
 						kFillModeSolid
 					);
 				}
