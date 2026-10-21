@@ -72,6 +72,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	bool isTransitioningFromBonus = false;
 	int bonusExitTransitionTimer = 0;
 
+	// ★追加: speed.png用 (300枚で4秒間だけ・1回限り) の管理変数
+	bool isSpeedBoostActive = false;     // 現在4秒間のスピードアップ中か
+	bool hasSpeedBoostTriggered = false; // すでに1回発動したか
+	int speedBoostTimer = 0;             // 4秒（240フレーム）計測タイマー
+
 	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
 	const int kBonusMapWidth = 100;
@@ -123,6 +128,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 宇宙ペンギン2 (バッテリー0時)
 	int universepengin2Texture =
 		Novice::LoadTexture("./Resources/images/universepengin2.png");
+	// ★追加: 宇宙ペンギン3 (コイン300枚以上・スピードアップ時)
+	int universepengin3Texture =
+		Novice::LoadTexture("./Resources/images/speed.png");
 	// 背景
 	int backgroundTexture =
 		Novice::LoadTexture("./Resources/images/iceBackGround.png");
@@ -1295,8 +1303,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				firePlayHandle = -1;
 			}
 
-			// 自動前進
-			player.worldLeftTop.posX += kMoveSpeed * 0.5f;
+			// 自動前進（コイン300枚以上で4秒間のみ超高速化）
+			float currentBonusSpeed = kMoveSpeed;
+
+			if (coinCount >= 300 && !hasSpeedBoostTriggered && !isSpeedBoostActive) {
+				isSpeedBoostActive = true;
+				hasSpeedBoostTriggered = true; // 1回限りに固定
+				speedBoostTimer = 0;
+			}
+
+			if (isSpeedBoostActive) {
+				currentBonusSpeed = kMoveSpeed * 2.5f; // スピード調整
+				speedBoostTimer++;
+				if (speedBoostTimer >= 240) { // 240フレーム（約4秒）経ったら終了
+					isSpeedBoostActive = false;
+				}
+			}
+
+			player.worldLeftTop.posX += currentBonusSpeed * 0.5f;
 
 			//==========================================
 			// SPACEで浮上（音は鳴らさない）
@@ -1558,9 +1582,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 
 			//==========================================
-			// 宇宙ペンギン描画 (バッテリー0時はuniversepengin2Textureを表示)
+			// 宇宙ペンギン描画 (4秒間のスピードアップ時のみ universepengin3Texture を表示)
 			//==========================================
-			int drawUniversePenginTex = isOutOfFuel ? universepengin2Texture : universepengin;
+			int drawUniversePenginTex = universepengin;
+
+			if (isSpeedBoostActive) {
+				drawUniversePenginTex = universepengin3Texture;
+			}
+			else if (isOutOfFuel) {
+				drawUniversePenginTex = universepengin2Texture;
+			}
 
 			if (drawUniversePenginTex != -1) {
 
@@ -1853,6 +1884,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				hasVisitedBonus = false;
 				hasTakenDamage = false;
 				starCount = 0;
+
+				// タイトル戻り時にスピードアップ用のフラグをリセット
+				isSpeedBoostActive = false;
+				hasSpeedBoostTriggered = false;
+				speedBoostTimer = 0;
+
 				memset(starConditions, 0, sizeof(starConditions));
 				memcpy(coinMap, initialCoinMap, sizeof(coinMap));
 				memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
