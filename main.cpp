@@ -53,11 +53,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	Box player{};
 	player.worldLeftTop = { 10.0f, 500.0f };
-	player.size = { 128.0f, 32.0f };
+	player.size = { 80.0f, 80.0f };
+	const float kPlayerDrawSize = 128.0f;
+	const float kPlayerOffsetX = (kPlayerDrawSize - player.size.posX) * 0.5f; 
+	const float kPlayerOffsetY = (kPlayerDrawSize - player.size.posY) * 0.5f;
 
 	const float kMoveSpeed = 10.0f;
 	const float kStageWidth = 1280.0f * 4.0f;
-	//const float kMaxScroll = kStageWidth - 1280.0f;
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
@@ -83,15 +85,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	bool isTransitioningFromBonus = false;
 	int bonusExitTransitionTimer = 0;
 
-	// ★追加: speed.png用 (300枚で4秒間だけ・1回限り) の管理変数
-	bool isSpeedBoostActive = false;     // 現在4秒間のスピードアップ中か
-	bool hasSpeedBoostTriggered = false; // すでに1回発動したか
-	int speedBoostTimer = 0;             // 4秒（240フレーム）計測タイマー
+	bool isSpeedBoostActive = false;    
+	bool hasSpeedBoostTriggered = false; 
+	int speedBoostTimer = 0;            
 
 	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
 	const int kBonusMapWidth = 100;
-	const int kBonusTileSize = 64;
+	const int kBonusTileSize = 128; // マップチップ間隔
+	const float kBonusItemHitSize = 80.0f;
 	int bonusMap[kBonusMapHeight][kBonusMapWidth] = {};
 
 	// 背景ループごとの獲得フラグ (各ループ・各マス用)
@@ -139,7 +141,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 宇宙ペンギン2 (バッテリー0時)
 	int universepengin2Texture =
 		Novice::LoadTexture("./Resources/images/universepengin2.png");
-	// ★追加: 宇宙ペンギン3 (コイン300枚以上・スピードアップ時)
+	// 宇宙ペンギン3 (コイン300枚以上・スピードアップ時)
 	int universepengin3Texture =
 		Novice::LoadTexture("./Resources/images/speed.png");
 	// 背景
@@ -208,9 +210,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	};
 
 	Enemy enemy{};
-	enemy.size = { 128.0f, 64.0f };
+	enemy.size = { 100.0f, 48.0f }; 
 	enemy.speed = 15.0f; // 移動速度
-	enemy.position = { 1280.0f + 200.0f, 300.0f }; // 高さを上方向（Y=300）にし右外側からスタート
+	enemy.position = { 1280.0f + 200.0f, 300.0f };
 	enemy.isActive = true;
 
 	//==========================================
@@ -219,7 +221,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int fireSound =
 		Novice::LoadAudio("./Resources/sound/fire.MP3");
 
-	// ★fireの再生ハンドル
 	int firePlayHandle = -1;
 
 	int coinSound =
@@ -275,7 +276,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		sizeof(trampolinePositions) / sizeof(trampolinePositions[0]);
 
 	const float kTrampolineBouncePower = 40.0f;
-	const int kTrampolineWidth = 32;
+	const int kTrampolineWidth = 100;
 	//==========================================
 	// 看板配置
 	//==========================================
@@ -290,7 +291,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kCoinMapHeight = 6;
 	const int kCoinMapWidth = 100;
 	const int kCoinMapSize = 64;
-	const float kCoinSize = 64.0f;
+	const float kCoinSize = 48.0f;
 
 	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
 	int coinMap[kCoinMapHeight][kCoinMapWidth] =
@@ -327,10 +328,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kBonusCoinMapWidth = 100;
 	const int kBonusCoinMapSize = 64;
 	const int kMaxCoinStageSets = 100;
-	// ★コインの当たり判定サイズ
-	const float kBonusCoinHitSize = 120.0f;
+	// ★コインの当たり判定サイズ (64x64に対して48x48に調整)
+	const float kBonusCoinHitSize = 48.0f;
 
-	// 1ループは2560px、1マスは64pxなので40マス
 	const int kBonusCoinLoopTileCount = 40;
 	const float kBonusCoinLoopWidth = 2560.0f;
 
@@ -925,10 +925,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				savedPlayerX = player.worldLeftTop.posX;
 			}
 
-			// 地面判定
-			if (player.worldLeftTop.posY >= kGroundY) {
+			// 地面判定 (足元に合わせて調整)
+			if (player.worldLeftTop.posY >= kGroundY + kPlayerOffsetY) {
 
-				player.worldLeftTop.posY = kGroundY;
+				player.worldLeftTop.posY = kGroundY + kPlayerOffsetY;
 				playerVelocityY = 0.0f;
 				isJumping = false;
 				jumpCount = 0;
@@ -961,11 +961,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							continue;
 						}
 
+						// ★コイン(64x64)の判定を中央寄り(48x48)にずらして配置
 						float coinX =
-							x * kCoinMapSize + set * kStageWidth;
+							x * kCoinMapSize + set * kStageWidth + 8.0f;
 
 						float coinY =
-							static_cast<float>(y * kCoinMapSize);
+							static_cast<float>(y * kCoinMapSize) + 8.0f;
 
 						float playerRight =
 							player.worldLeftTop.posX +
@@ -1258,14 +1259,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				);
 			}
 
-			// プレイヤー
+			// ★プレイヤー描画（当たり判定のオフセット分引いて見た目位置を正しく描画）
 			if (isJumping && playerJumpTexture != -1) {
 
 				Novice::DrawSpriteRect(
 					static_cast<int>(
-						player.worldLeftTop.posX - scrollValue
+						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
 						),
-					static_cast<int>(player.worldLeftTop.posY),
+					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
 					jumpFrame * 128,
 					0,
 					128, 128,
@@ -1279,9 +1280,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				Novice::DrawSprite(
 					static_cast<int>(
-						player.worldLeftTop.posX - scrollValue
+						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
 						),
-					static_cast<int>(player.worldLeftTop.posY),
+					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
 					playerTexture,
 					1.0f, 1.0f, 0.0f, WHITE
 				);
@@ -1493,13 +1494,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							continue;
 						}
 
-						// コインのワールド座標
+						// ★コイン(64x64)の判定を中心寄り(48x48)に配置
 						float coinX =
 							x * kBonusCoinMapSize
-							+ loop * kBonusCoinLoopWidth;
+							+ loop * kBonusCoinLoopWidth + 8.0f;
 
-						int coinY =
-							y * kBonusCoinMapSize;
+						float coinY =
+							static_cast<float>(y * kBonusCoinMapSize) + 8.0f;
 
 						// プレイヤーの座標
 						float playerLeft = player.worldLeftTop.posX;
@@ -1511,9 +1512,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 						float hitSize = kBonusCoinHitSize;
 
-						// コインの中心を基準に当たり判定を拡大
-						float hitLeft = coinX - (hitSize - kBonusCoinMapSize) * 0.5f;
-						float hitTop = coinY - (hitSize - kBonusCoinMapSize) * 0.5f;
+						// コイン矩形との当たり判定
+						float hitLeft = coinX;
+						float hitTop = coinY;
 
 						if (playerLeft < hitLeft + hitSize &&
 							playerRight > hitLeft &&
@@ -1642,8 +1643,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						continue;
 					}
 
-					float baseItemX = static_cast<float>(x * kBonusTileSize);
-					float itemY = static_cast<float>(y * kBonusTileSize);
+					// ★電池(128x128)の判定を中央寄り(80x80)に計算
+					float baseItemX = static_cast<float>(x * kBonusTileSize) + 24.0f;
+					float itemY = static_cast<float>(y * kBonusTileSize) + 24.0f;
 
 					for (int i = 0; i < kMaxBonusLoops; i++) {
 
@@ -1654,9 +1656,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 						float itemX = baseItemX + i * kLoopWidth;
 
-						if (player.worldLeftTop.posX < itemX + kBonusTileSize &&
+						if (player.worldLeftTop.posX < itemX + kBonusItemHitSize &&
 							player.worldLeftTop.posX + player.size.posX > itemX &&
-							player.worldLeftTop.posY < itemY + kBonusTileSize &&
+							player.worldLeftTop.posY < itemY + kBonusItemHitSize &&
 							player.worldLeftTop.posY + player.size.posY > itemY) {
 
 							// アイテム獲得フラグを立てて消す
@@ -1790,7 +1792,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 
 			//==========================================
-			// 宇宙ペンギン描画 (4秒間のスピードアップ時のみ universepengin3Texture を表示)
+			// 宇宙ペンギン描画 (見た目オフセットを補正して描画)
 			//==========================================
 			int drawUniversePenginTex = universepengin;
 
@@ -1805,9 +1807,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				Novice::DrawSpriteRect(
 					static_cast<int>(
-						player.worldLeftTop.posX - scrollValue
+						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
 						),
-					static_cast<int>(player.worldLeftTop.posY),
+					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
 					universeFrame * 128,
 					0,
 					128, 128,
@@ -2030,7 +2032,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						player.worldLeftTop.posX = 0.0f;
 					}
 
-					player.worldLeftTop.posY = kGroundY;
+					player.worldLeftTop.posY = kGroundY + kPlayerOffsetY;
 					playerVelocityY = 0.0f;
 
 					isJumping = false;
@@ -2313,10 +2315,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			// 地面判定
-			if (player.worldLeftTop.posY >= kGroundY) {
+			// 地面判定 (足元に合わせて調整)
+			if (player.worldLeftTop.posY >= kGroundY + kPlayerOffsetY) {
 
-				player.worldLeftTop.posY = kGroundY;
+				player.worldLeftTop.posY = kGroundY + kPlayerOffsetY;
 				playerVelocityY = 0.0f;
 				isJumping = false;
 				jumpCount = 0;
@@ -2345,11 +2347,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							continue;
 						}
 
+						// ★コイン(64x64)の判定を中央寄り(48x48)にずらして配置
 						float coinX =
-							x * kCoinMapSize + set * kStageWidth;
+							x * kCoinMapSize + set * kStageWidth + 8.0f;
 
 						float coinY =
-							static_cast<float>(y * kCoinMapSize);
+							static_cast<float>(y * kCoinMapSize) + 8.0f;
 
 						float playerRight =
 							player.worldLeftTop.posX +
@@ -2637,14 +2640,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				);
 			}
 
-			// プレイヤー
+			// ★プレイヤー描画（当たり判定のオフセット分引いて見た目位置を正しく描画）
 			if (isJumping && playerJumpTexture != -1) {
 
 				Novice::DrawSpriteRect(
 					static_cast<int>(
-						player.worldLeftTop.posX - scrollValue
+						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
 						),
-					static_cast<int>(player.worldLeftTop.posY),
+					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
 					jumpFrame * 128,
 					0,
 					128, 128,
@@ -2658,9 +2661,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				Novice::DrawSprite(
 					static_cast<int>(
-						player.worldLeftTop.posX - scrollValue
+						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
 						),
-					static_cast<int>(player.worldLeftTop.posY),
+					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
 					playerTexture,
 					1.0f, 1.0f, 0.0f, WHITE
 				);
