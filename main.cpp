@@ -56,7 +56,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	player.worldLeftTop = { 10.0f, 500.0f };
 	player.size = { 80.0f, 80.0f };
 	const float kPlayerDrawSize = 128.0f;
-	const float kPlayerOffsetX = (kPlayerDrawSize - player.size.posX) * 0.5f; 
+	const float kPlayerOffsetX = (kPlayerDrawSize - player.size.posX) * 0.5f;
 	const float kPlayerOffsetY = (kPlayerDrawSize - player.size.posY) * 0.5f;
 
 	const float kMoveSpeed = 10.0f;
@@ -86,9 +86,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	bool isTransitioningFromBonus = false;
 	int bonusExitTransitionTimer = 0;
 
-	bool isSpeedBoostActive = false;    
-	bool hasSpeedBoostTriggered = false; 
-	int speedBoostTimer = 0;            
+	bool isSpeedBoostActive = false;
+	bool hasSpeedBoostTriggered = false;
+	int speedBoostTimer = 0;
 
 	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
@@ -211,7 +211,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	};
 
 	Enemy enemy{};
-	enemy.size = { 100.0f, 48.0f }; 
+	enemy.size = { 100.0f, 48.0f };
 	enemy.speed = 15.0f; // 移動速度
 	enemy.position = { 1280.0f + 200.0f, 300.0f };
 	enemy.isActive = true;
@@ -278,6 +278,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	const float kTrampolineBouncePower = 40.0f;
 	const int kTrampolineWidth = 100;
+	const float kTrampolineOffsetY = 60.0f;
 	//==========================================
 	// 看板配置
 	//==========================================
@@ -886,7 +887,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					trampolinePositions[i].posX;
 
 				float trampolineY =
-					trampolinePositions[i].posY;
+					trampolinePositions[i].posY + kTrampolineOffsetY;
 
 				float playerRight =
 					player.worldLeftTop.posX + player.size.posX;
@@ -2321,7 +2322,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						set * kStageWidth;
 
 					float trampolineY =
-						trampolinePositions[i].posY;
+						trampolinePositions[i].posY + kTrampolineOffsetY;
 
 					float playerRight =
 						player.worldLeftTop.posX +
@@ -2727,7 +2728,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				);
 			}
 
-			// ★プレイヤー描画（当たり判定のオフセット分引いて見た目位置を正しく描画）
+			// プレイヤー描画
 			if (isJumping && playerJumpTexture != -1) {
 
 				Novice::DrawSpriteRect(
