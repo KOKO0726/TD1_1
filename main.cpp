@@ -291,8 +291,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kBonusCoinMapHeight = 11;
 	const int kBonusCoinMapWidth = 100;
 	const int kBonusCoinMapSize = 64;
-
 	const int kMaxCoinStageSets = 100;
+	// ★コインの当たり判定サイズ
+	const float kBonusCoinHitSize = 120.0f;
 
 	// 1ループは2560px、1マスは64pxなので40マス
 	const int kBonusCoinLoopTileCount = 40;
@@ -1361,11 +1362,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						float playerBottom =
 							player.worldLeftTop.posY + player.size.posY;
 
-						// 当たり判定
-						if (playerLeft < coinX + kBonusCoinMapSize &&
-							playerRight > coinX &&
-							playerTop < coinY + kBonusCoinMapSize &&
-							playerBottom > coinY) {
+						float hitSize = kBonusCoinHitSize;
+
+						// コインの中心を基準に当たり判定を拡大
+						float hitLeft = coinX - (hitSize - kBonusCoinMapSize) * 0.5f;
+						float hitTop = coinY - (hitSize - kBonusCoinMapSize) * 0.5f;
+
+						if (playerLeft < hitLeft + hitSize &&
+							playerRight > hitLeft &&
+							playerTop < hitTop + hitSize &&
+							playerBottom > hitTop) {
 
 							// このループのコインだけ取得済みにする
 							bonusCoinCollected[loop][y][x] = true;
