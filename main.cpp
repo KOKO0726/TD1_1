@@ -234,7 +234,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		sprintf_s(path, sizeof(path), "./Resources/images/count/count%d.png", i);
 		countTextures[i] = Novice::LoadTexture(path);
 	}
-	int slashTexture = Novice::LoadTexture("./Resources/images/slash.png");
 	//ライフの画像
 	int playerLifeTexture =
 		Novice::LoadTexture("./Resources/images/life.png");
@@ -297,6 +296,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	int pushSound =
 		Novice::LoadAudio("./Resources/sound/push.MP3");
+
+	int starSound =
+		Novice::LoadAudio("./Resources/sound/star.MP3");
 
 	//==========================================
 	// BGM
@@ -2519,8 +2521,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				if (coin != -1) {
 					Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
 				}
-				DrawCoinEffects();
-				DrawCoinCount();
+				Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
+
 				// 星が20フレームごとに1個ずつ飛び出す演出
 				const int kStarInterval = 20;
 				const int kStarSize = 180; // star.png / noStar.png の画像サイズ
@@ -2528,6 +2530,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				for (int i = 0; i < 4; i++) {
 					int starElapsed = clearTimer - (i + 1) * kStarInterval;
 					if (starElapsed < 0) continue;
+
+					// 条件を満たした星（starConditions[i] == true）が出現した1フレーム目のみ効果音を鳴らす
+					if (starElapsed == 0 && starConditions[i]) {
+						if (starSound != -1) {
+							Novice::PlayAudio(starSound, false, 0.8f);
+						}
+					}
 
 					int texture = starConditions[i] ? starTexture : noStarTexture;
 					if (texture == -1) continue;
@@ -2548,29 +2557,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
 					Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
 
-					// 星の下に条件画像を表示
-					if (clearLabelTextures[i] != -1) {
-						Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
-							0.65f, 0.65f, 0.0f, WHITE);
-					}
+					// 星の下に獲得条件を表示
+					const char* starLabels[4] = {
+						"GOAL", "BONUS", "COIN 400", "NO DAMAGE"
+					};
+					const int labelWidth[4] = { 4, 5, 8, 9 };
+					int labelX = centerX - labelWidth[i] * 4;
+					Novice::ScreenPrintf(labelX, 585, "%s", starLabels[i]);
+					Novice::ScreenPrintf(centerX - 12, 605, "%s",
+						starConditions[i] ? "OK" : "NG");
 				}
-				// 獲得星数を数字画像で表示
 				if (clearTimer >= 4 * kStarInterval + 16) {
-					// クリア画面の獲得星数：数字とスラッシュを小さくして画面内に収める
-					const float digitScale = 0.05f;
-					const float slashScale = 0.30f;
-					if (countTextures[starCount] != -1)
-						Novice::DrawSprite(595, 670, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
-					if (slashTexture != -1)
-						Novice::DrawSprite(615, 665, slashTexture, slashScale, slashScale, 0.0f, WHITE);
-					if (countTextures[4] != -1)
-						Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
+					Novice::ScreenPrintf(570, 650, "STAR : %d / 4", starCount);
 				}
 				// 4つの星をすべて獲得したときだけPERFECTを表示
-				// 4つ目の星の登場アニメーションが終わってから表示
 				if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
 					int perfectElapsed = clearTimer - 110;
 					float perfectScale = 1.0f;
+					if (perfectElapsed == 0) {
+						if (starSound != -1) {
+							Novice::PlayAudio(starSound, false, 1.0f);
+						}
+					}
 					if (perfectElapsed < 10) {
 						perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
 					}
