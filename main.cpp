@@ -220,6 +220,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//ライフの画像
 	int playerLifeTexture =
 		Novice::LoadTexture("./Resources/images/life.png");
+	//チュートリアル説明用画像
+	int tutorialTextTexture =
+		Novice::LoadTexture("./Resources/images/tutorialText.png");
+	int tutorialTextTexture2 =
+		Novice::LoadTexture("./Resources/images/tutorialText2.png");
+	int tutorialTextTexture3 =
+		Novice::LoadTexture("./Resources/images/tutorialText3.png");
+	int tutorialTextTexture4 =
+		Novice::LoadTexture("./Resources/images/tutorialText4.png");
 
 	//==========================================
 	// 敵（シャチ）の設定
@@ -3066,28 +3075,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				// 画面暗転オーバーレイ
 				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x00000088, kFillModeSolid);
 
-				// ガイド枠・テキスト表示
-				Novice::DrawBox(340, 260, 600, 200, 0.0f, 0x111133DD, kFillModeSolid);
-				Novice::DrawBox(340, 260, 600, 200, 0.0f, WHITE, kFillModeWireFrame);
-
 				if (tutorialPauseType == 0) {
 					// 【開始時空中ジャンプガイド】
 					if (tutorialStep == 1) {
-						Novice::ScreenPrintf(460, 310, "PRESS SPACE TO 1ST JUMP!");
+						Novice::DrawSprite(460, 310, tutorialTextTexture, 1.0f, 1.0f, 0.0f, WHITE);
 					}
 					else if (tutorialStep == 2) {
-						Novice::ScreenPrintf(460, 310, "1ST JUMP!");
-						Novice::ScreenPrintf(410, 350, "PRESS SPACE TO 2ND JUMP!");
+						Novice::DrawSprite(460, 310, tutorialTextTexture2, 1.0f, 1.0f, 0.0f, WHITE);
 					}
 					else if (tutorialStep == 3) {
-						Novice::ScreenPrintf(460, 310, "2ND JUMP!");
-						Novice::ScreenPrintf(410, 350, "PRESS SPACE TO 3RD JUMP!");
+						Novice::DrawSprite(460, 310, tutorialTextTexture3, 1.0f, 1.0f, 0.0f, WHITE);
 					}
 				}
 				else if (tutorialPauseType == 1) {
 					// 【トランポリン前ガイド】
-					Novice::ScreenPrintf(460, 310, "TRAMPOLINE AHEAD!");
-					Novice::ScreenPrintf(410, 350, "PRESS SPACE TO JUMP!");
+					Novice::DrawSprite(460, 310, tutorialTextTexture4, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 			}
 
