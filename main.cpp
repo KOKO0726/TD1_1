@@ -171,7 +171,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 背景
 	int backgroundTexture =
 		Novice::LoadTexture("./Resources/images/iceBackGround.png");
-	// 宇宙ステージ1
+	// 宇宙ステージ1  
 	int universeTexture =
 		Novice::LoadTexture("./Resources/images/universe.png");
 	// 宇宙ステージ2
@@ -234,7 +234,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		sprintf_s(path, sizeof(path), "./Resources/images/count/count%d.png", i);
 		countTextures[i] = Novice::LoadTexture(path);
 	}
-	int slashTexture = Novice::LoadTexture("./Resources/images/slash.png");
 	//ライフの画像
 	int playerLifeTexture =
 		Novice::LoadTexture("./Resources/images/life.png");
@@ -298,6 +297,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int pushSound =
 		Novice::LoadAudio("./Resources/sound/push.MP3");
 
+	int starSound =
+		Novice::LoadAudio("./Resources/sound/star.MP3");
 	//==========================================
 	// BGM
 	//==========================================
@@ -2465,136 +2466,144 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				break;
 			}
 
-						   //==========================================
-						   // クリア
-						   //==========================================
-			case Clear: {
-				clearTimer++;
-				if (clearTexture != -1) {
-					Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
-				}
-				else {
-					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
-					Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
-				}
-				// クリア画面にも獲得コインを表示
-				if (coin != -1) {
-					Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
-				}
-				DrawCoinCount();
-				// 星が20フレームごとに1個ずつ飛び出す演出
-				const int kStarInterval = 20;
-				const int kStarSize = 180; // star.png / noStar.png の画像サイズ
-				const float kStarFinalScale = 0.9f;
-				for (int i = 0; i < 4; i++) {
-					int starElapsed = clearTimer - (i + 1) * kStarInterval;
-					if (starElapsed < 0) continue;
-
-					int texture = starConditions[i] ? starTexture : noStarTexture;
-					if (texture == -1) continue;
-
-					// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
-					float scale = kStarFinalScale;
-					if (starElapsed < 8) {
-						scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
-					}
-					else if (starElapsed < 16) {
-						scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
-					}
-
-					// 拡大・縮小しても星の中心位置が動かないようにする
-					int centerX = 325 + i * 210;
-					int centerY = 480;
-					int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
-					int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
-					Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
-
-					// 星の下に条件画像を表示
-					if (clearLabelTextures[i] != -1) {
-						Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
-							0.65f, 0.65f, 0.0f, WHITE);
-					}
-				}
-				// 獲得星数を数字画像で表示
-				if (clearTimer >= 4 * kStarInterval + 16) {
-					const float digitScale = 0.38f;
-					if (countTextures[starCount] != -1)
-						Novice::DrawSprite(559, 650, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
-					if (slashTexture != -1)
-						Novice::DrawSprite(609, 650, slashTexture, digitScale, digitScale, 0.0f, WHITE);
-					if (countTextures[4] != -1)
-						Novice::DrawSprite(690, 650, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
-				}
-				// 4つの星をすべて獲得したときだけPERFECTを表示
-				// 4つ目の星の登場アニメーションが終わってから表示
-				if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
-					int perfectElapsed = clearTimer - 110;
-					float perfectScale = 1.0f;
-					if (perfectElapsed < 10) {
-						perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
-					}
-					else if (perfectElapsed < 20) {
-						perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
-					}
-					// perfect.png は400x200。上部中央に表示
-					const int perfectWidth = 400;
-					const int perfectHeight = 200;
-					int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
-					int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
-					Novice::DrawSprite(perfectX, perfectY, perfectTexture,
-						perfectScale, perfectScale, 0.0f, WHITE);
-				}
-				if (clearTimer >= kClearShowFrames) {
-					scene = Title;
-					timer = 0;
-					selectedMenu = 0;
-					isRuleOpen = false;
-					isTitleFading = false;
-					titleFadeTimer = 0;
-					title1Y = -180.0f;
-					title2Y = -250.0f;
-					title1Velocity = 0.0f;
-					title2Velocity = 0.0f;
-					penguinX = -200.0f;
-					penguinY = 380.0f;
-					player.worldLeftTop = { 10.0f, 500.0f };
-					playerVelocityY = 0.0f;
-					isJumping = false;
-					jumpCount = 0;
-					jumpFrame = 0;
-					jumpAnimationTimer = 0;
-					scrollValue = 0.0f;
-					gameFadeTimer = 0;
-					isGameClear = false;
-					goalTimer = 0;
-					goalFlagFrame = 0;
-					coinCount = 0;
-					hasVisitedBonus = false;
-					hasTakenDamage = false;
-					starCount = 0;
-
-					// タイトル戻り時にスピードアップ用のフラグをリセット
-					isSpeedBoostActive = false;
-					hasSpeedBoostTriggered = false;
-					speedBoostTimer = 0;
-
-					memset(starConditions, 0, sizeof(starConditions));
-					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
-					memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
-					memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
-					isTransitioningToBonus = false;
-					isTransitioningFromBonus = false;
-					bonusTransitionTimer = 0;
-					bonusExitTransitionTimer = 0;
-					batteryFrame = 0;
-					batteryTimer = 0;
-					if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
-					if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
-					if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
-					if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
-				}
-				break;
+			//==========================================
+			// クリア
+			//==========================================
+		case Clear: {
+			clearTimer++;
+			if (clearTexture != -1) {
+				Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
 			}
+			else {
+				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
+				Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+			}
+			// クリア画面にも獲得コインを表示
+			if (coin != -1) {
+				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+			}
+			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
+			// 星が20フレームごとに1個ずつ飛び出す演出
+			const int kStarInterval = 20;
+			const int kStarSize = 180; // star.png / noStar.png の画像サイズ
+			const float kStarFinalScale = 0.9f;
+			for (int i = 0; i < 4; i++) {
+				int starElapsed = clearTimer - (i + 1) * kStarInterval;
+				if (starElapsed < 0) continue;
+
+				// 条件を満たした星（starConditions[i] == true）が出現した1フレーム目のみ効果音を鳴らす
+				if (starElapsed == 0 && starConditions[i]) {
+					if (starSound != -1) {
+						Novice::PlayAudio(starSound, false, 0.8f);
+					}
+				}
+
+				int texture = starConditions[i] ? starTexture : noStarTexture;
+				if (texture == -1) continue;
+
+				// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
+				float scale = kStarFinalScale;
+				if (starElapsed < 8) {
+					scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
+				}
+				else if (starElapsed < 16) {
+					scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
+				}
+
+				// 拡大・縮小しても星の中心位置が動かないようにする
+				int centerX = 325 + i * 210;
+				int centerY = 480;
+				int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
+				int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
+				Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
+
+				// 星の下に獲得条件を表示
+				const char* starLabels[4] = {
+					"GOAL", "BONUS", "COIN 400", "NO DAMAGE"
+				};
+				const int labelWidth[4] = { 4, 5, 8, 9 };
+				int labelX = centerX - labelWidth[i] * 4;
+				Novice::ScreenPrintf(labelX, 585, "%s", starLabels[i]);
+				Novice::ScreenPrintf(centerX - 12, 605, "%s",
+					starConditions[i] ? "OK" : "NG");
+			}
+			if (clearTimer >= 4 * kStarInterval + 16) {
+				Novice::ScreenPrintf(570, 650, "STAR : %d / 4", starCount);
+			}
+			// 4つの星をすべて獲得したときだけPERFECTを表示
+			if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
+				int perfectElapsed = clearTimer - 110;
+				float perfectScale = 1.0f;
+				if (perfectElapsed == 0) {
+					if (starSound != -1) {
+						Novice::PlayAudio(starSound, false, 1.0f);
+					}
+				}
+				if (perfectElapsed < 10) {
+					perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
+				}
+				else if (perfectElapsed < 20) {
+					perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+				}
+				// perfect.png は400x200。上部中央に表示
+				const int perfectWidth = 400;
+				const int perfectHeight = 200;
+				int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
+				int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
+				Novice::DrawSprite(perfectX, perfectY, perfectTexture,
+					perfectScale, perfectScale, 0.0f, WHITE);
+			}
+			if (clearTimer >= kClearShowFrames) {
+				scene = Title;
+				timer = 0;
+				selectedMenu = 0;
+				isRuleOpen = false;
+				isTitleFading = false;
+				titleFadeTimer = 0;
+				title1Y = -180.0f;
+				title2Y = -250.0f;
+				title1Velocity = 0.0f;
+				title2Velocity = 0.0f;
+				penguinX = -200.0f;
+				penguinY = 380.0f;
+				player.worldLeftTop = { 10.0f, 500.0f };
+				playerVelocityY = 0.0f;
+				isJumping = false;
+				jumpCount = 0;
+				jumpFrame = 0;
+				jumpAnimationTimer = 0;
+				scrollValue = 0.0f;
+				gameFadeTimer = 0;
+				isGameClear = false;
+				goalTimer = 0;
+				goalFlagFrame = 0;
+				coinCount = 0;
+				hasVisitedBonus = false;
+				hasTakenDamage = false;
+				starCount = 0;
+
+				// タイトル戻り時にスピードアップ用のフラグをリセット
+				isSpeedBoostActive = false;
+				hasSpeedBoostTriggered = false;
+				speedBoostTimer = 0;
+
+				memset(starConditions, 0, sizeof(starConditions));
+				memcpy(coinMap, initialCoinMap, sizeof(coinMap));
+				memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
+				memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
+				isTransitioningToBonus = false;
+				isTransitioningFromBonus = false;
+				bonusTransitionTimer = 0;
+				bonusExitTransitionTimer = 0;
+				batteryFrame = 0;
+				batteryTimer = 0;
+				if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
+				if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
+				if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+				if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
+			}
+			break;
+		}
 
 
 					  //==========================================
