@@ -1,6 +1,8 @@
 #include <Novice.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
+#include <time.h>
 
 const char kWindowTitle[] = "LC1D_12_タカハシ";
 
@@ -46,6 +48,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	Novice::Initialize(kWindowTitle, 1280, 720);
 
+	// 乱数の初期化
+	srand(static_cast<unsigned int>(time(NULL)));
+
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
@@ -64,6 +69,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
+
+	// ライフと無敵時間（エネミー当たり判定用）
+	int playerLife = 3;
+	bool isInvincible = false;
+	int invincibleTimer = 0;
+	const int kInvincibleDuration = 120; // ダメージ後約2秒間の無敵時間
+
 	//==========================================
 	// ステージセット変数
 	//==========================================
@@ -100,6 +112,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 背景ループごとの獲得フラグ (各ループ・各マス用)
 	const int kMaxBonusLoops = 10;
 	bool bonusItemCollected[kMaxBonusLoops][kBonusMapHeight][kBonusMapWidth] = {};
+
+	//==========================================
+	// チュートリアル用ガイド変数
+	//==========================================
+	bool isTutorialPaused = false;
+	bool isStartGuideDone = false;       // 開始時の空中ジャンプガイド完了フラグ
+	bool isTrampolineGuideDone = false;  // トランポリン手前ガイド完了フラグ
+	int tutorialPauseType = 0;           // 0: 開始時空中ポーズ, 1: トランポリン前ポーズ
+	int tutorialStep = 1;                // 開始時ポーズの段数(1~3)
+	bool isWaitingForPeak = false;       // ジャンプ頂点到達待ちフラグ
 
 	//==========================================
 	// ジャンプ
@@ -208,13 +230,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		Vector2 size;
 		float speed;
 		bool isActive;
+		bool hasTrampoline; // トランポリンを乗せているかのフラグ
 	};
 
 	Enemy enemy{};
-	enemy.size = { 100.0f, 48.0f };
-	enemy.speed = 15.0f; // 移動速度
-	enemy.position = { 1280.0f + 200.0f, 300.0f };
+	enemy.size = { 256.0f, 128.0f }; // サイズ256x128
+	enemy.speed = 8.0f; // 移動速度
+	enemy.position = { 1280.0f + 200.0f, 420.0f };
 	enemy.isActive = true;
+	enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付き
 
 	//==========================================
 	// 効果音
@@ -581,6 +605,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (selectedMenu == 0) {
 						scene = Game;
 
+						// ライフと無敵時間を初期化
+						playerLife = 3;
+						isInvincible = false;
+						invincibleTimer = 0;
+
+						// 通常ゲーム開始時の位置セット
+						player.worldLeftTop = { 10.0f, 500.0f };
+						enemy.position = { 1280.0f + 200.0f, 420.0f };
+						enemy.isActive = true;
+						enemy.hasTrampoline = (rand() % 2 == 0); // スタート時のシャチの種類をランダム決定
+
 						// ステージBGMを再生
 						if (kStageHandle != -1) {
 							stagePlayHandle =
@@ -590,6 +625,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					else if (selectedMenu == 1) {
 
 						scene = tutorial;
+
+						// チュートリアル用に初期化（最初は地面で停止してSPACE押し待ち）
+						player.worldLeftTop = { 10.0f, kGroundY + kPlayerOffsetY };
+						playerVelocityY = 0.0f;
+						isJumping = false;
+						jumpCount = 0;
+
+						enemy.position = { 1000.0f, 420.0f };
+						enemy.isActive = false;
+						enemy.hasTrampoline = true; // チュートリアルはトランポリン付きで固定
+
+						// 最初は画面停止（ポーズ）でプレイヤーのSPACE開始入力を待つ
+						isTutorialPaused = true;
+						isStartGuideDone = false;
+						isTrampolineGuideDone = false;
+						tutorialPauseType = 0; // 0: 開始時ガイド
+						tutorialStep = 1;
+						isWaitingForPeak = false;
+
+						// タイトル画面決定時のSPACE押しっぱなし判定を防ぐためキー入力を上書き
+						preKeys[DIK_SPACE] = 1;
 
 						if (kTutorialHandle != -1) {
 							Novice::PlayAudio(
@@ -805,6 +861,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 
 			//==========================================
+			// 無敵時間の処理
+			//==========================================
+			if (isInvincible) {
+				invincibleTimer++;
+				if (invincibleTimer >= kInvincibleDuration) {
+					isInvincible = false;
+					invincibleTimer = 0;
+				}
+			}
+
+			float previousPlayerBottom =
+				player.worldLeftTop.posY + player.size.posY;
+
+			//==========================================
 			// 更新処理
 			//==========================================
 			if (!isTransitioningToBonus && !isGameClear) {
@@ -846,13 +916,47 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			// シャチ（敵）の更新処理
 			//==========================================
 			if (enemy.isActive && !isGameClear) {
-				// 右から左へ高速移動
+				// 右から左へ移動
 				enemy.position.posX -= enemy.speed;
 
 				// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
 				if (enemy.position.posX + enemy.size.posX < scrollValue) {
 					enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-					enemy.position.posY = 300.0f;
+					enemy.position.posY = 420.0f;
+					enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付きにランダム変更
+				}
+
+				//==========================================
+				// エネミー（シャチ）との当たり判定
+				//==========================================
+				if (!isInvincible && !isTransitioningToBonus && !isGameClear) {
+					float playerLeft = player.worldLeftTop.posX;
+					float playerRight = player.worldLeftTop.posX + player.size.posX;
+					float playerTop = player.worldLeftTop.posY;
+					float playerBottom = player.worldLeftTop.posY + player.size.posY;
+
+					float enemyLeft = enemy.position.posX;
+					float enemyRight = enemy.position.posX + enemy.size.posX;
+					float enemyTop = enemy.position.posY;
+					float enemyBottom = enemy.position.posY + enemy.size.posY;
+
+					// 矩形同士のオーバーラップ判定
+					if (playerLeft < enemyRight &&
+						playerRight > enemyLeft &&
+						playerTop < enemyBottom &&
+						playerBottom > enemyTop) {
+
+						// ライフを1つ減らす
+						if (playerLife > 0) {
+							playerLife--;
+						}
+
+						hasTakenDamage = true; // 星の獲得条件用フラグ
+
+						// 無敵開始
+						isInvincible = true;
+						invincibleTimer = 0;
+					}
 				}
 			}
 
@@ -868,8 +972,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						(jumpFrame + 1) % kJumpFrameCount;
 				}
 			}
-
-
 
 			// 重力
 			if (isJumping) {
@@ -954,6 +1056,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						Novice::PlayAudio(
 							trampolineSound, false, 0.8f
 						);
+					}
+				}
+			}
+
+			// ★通常ゲームでの「シャチの上のトランポリン」当たり判定 (hasTrampoline が true の時のみ判定)
+			if (enemy.isActive && enemy.hasTrampoline && !isGameClear) {
+				float enemyTrampolineX = enemy.position.posX;
+				float enemyTrampolineY = enemy.position.posY - 60.0f + kTrampolineOffsetY;
+
+				float playerRight = player.worldLeftTop.posX + player.size.posX;
+				float playerBottom = player.worldLeftTop.posY + player.size.posY;
+
+				bool isOverlapX = player.worldLeftTop.posX < enemyTrampolineX + kTrampolineWidth && playerRight > enemyTrampolineX;
+				bool isLanding = previousPlayerBottom <= enemyTrampolineY && playerBottom >= enemyTrampolineY;
+
+				if (playerVelocityY > 0.0f && isOverlapX && isLanding) {
+					player.worldLeftTop.posY = enemyTrampolineY - player.size.posY;
+					playerVelocityY = -kTrampolineBouncePower;
+					isJumping = true;
+
+					// パーティカル発生
+					float particleCenterX = enemyTrampolineX + kTrampolineWidth / 2.0f;
+					float particleCenterY = enemyTrampolineY;
+					int spawnedCount = 0;
+
+					for (int p = 0; p < kMaxParticles; p++) {
+						if (!particles[p].isActive) {
+							float angle = 3.1415926f + (3.1415926f / 7.0f) * spawnedCount;
+							particles[p].position = { particleCenterX, particleCenterY };
+							particles[p].velocity = { cosf(angle) * 6.0f, sinf(angle) * 6.0f };
+							particles[p].timer = 0;
+							particles[p].lifeTime = 18;
+							particles[p].radius = 6.0f;
+							particles[p].color = 0xA0A0A0FF;
+							particles[p].isActive = true;
+
+							spawnedCount++;
+							if (spawnedCount >= 8) break;
+						}
+					}
+
+					if (trampolineSound != -1) {
+						Novice::PlayAudio(trampolineSound, false, 0.8f);
 					}
 				}
 			}
@@ -1249,7 +1394,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-
 			// 黄色いコイン用パーティクル描画
 			for (int i = 0; i < kMaxParticles; i++)
 			{
@@ -1303,35 +1447,76 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					enemyTexture,
 					1.0f, 1.0f, 0.0f, WHITE
 				);
-			}
 
-			// ★プレイヤー描画（当たり判定のオフセット分引いて見た目位置を正しく描画）
-			if (isJumping && playerJumpTexture != -1) {
+				// ★hasTrampoline が true の時だけ真上にトランポリンを描画
+				if (enemy.hasTrampoline && trampoline != -1) {
+					Novice::DrawSprite(
+						static_cast<int>(enemy.position.posX - scrollValue),
+						static_cast<int>(enemy.position.posY - 60.0f),
+						trampoline,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
+				}
 
-				Novice::DrawSpriteRect(
-					static_cast<int>(
-						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
-						),
-					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
-					jumpFrame * 128,
-					0,
-					128, 128,
-					playerJumpTexture,
-					0.25f, 1.0f,
-					0.0f, WHITE
+				// ★【デバッグ用】シャチ本体の当たり判定枠を赤線で表示
+				Novice::DrawBox(
+					static_cast<int>(enemy.position.posX - scrollValue),
+					static_cast<int>(enemy.position.posY),
+					static_cast<int>(enemy.size.posX),
+					static_cast<int>(enemy.size.posY),
+					0.0f,
+					0xFF0000FF, // 赤色 (RGBA)
+					kFillModeWireFrame
 				);
 
+				// ★【デバッグ用】トランポリン判定ゾーンを赤線で表示（hasTrampolineがtrueの時のみ）
+				if (enemy.hasTrampoline) {
+					Novice::DrawBox(
+						static_cast<int>(enemy.position.posX - scrollValue),
+						static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY),
+						kTrampolineWidth,
+						20, // 跳ね返り高さの判定幅
+						0.0f,
+						0xFF0000FF, // 赤色 (RGBA)
+						kFillModeWireFrame
+					);
+				}
 			}
-			else if (playerTexture != -1) {
 
-				Novice::DrawSprite(
-					static_cast<int>(
-						player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
-						),
-					static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
-					playerTexture,
-					1.0f, 1.0f, 0.0f, WHITE
-				);
+			// ★プレイヤー描画（無敵時間中の点滅処理を考慮）
+			bool shouldDrawPlayer = true;
+			if (isInvincible && (invincibleTimer / 4) % 2 == 0) {
+				shouldDrawPlayer = false; // 無敵時間は4フレームごとに点滅表示
+			}
+
+			if (shouldDrawPlayer) {
+				if (isJumping && playerJumpTexture != -1) {
+
+					Novice::DrawSpriteRect(
+						static_cast<int>(
+							player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
+							),
+						static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
+						jumpFrame * 128,
+						0,
+						128, 128,
+						playerJumpTexture,
+						0.25f, 1.0f,
+						0.0f, WHITE
+					);
+
+				}
+				else if (playerTexture != -1) {
+
+					Novice::DrawSprite(
+						static_cast<int>(
+							player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
+							),
+						static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
+						playerTexture,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
+				}
 			}
 
 			// コイン画像と獲得枚数を右上に表示
@@ -1341,10 +1526,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
 
 			//==========================================
-			// ライフ描画（左上に3つ）
+			// ライフ描画（残数に応じて描画）
 			//==========================================
 			if (playerLifeTexture != -1) {
-				for (int i = 0; i < 3; i++) {
+				for (int i = 0; i < playerLife; i++) {
 					Novice::DrawSprite(
 						20 + i * 60, 20,  // 描画位置
 						playerLifeTexture,
@@ -2228,219 +2413,170 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				  //==========================================
 
 		case tutorial: {
+			// チュートリアル用の弱めのトランポリン跳ね返り力
+			const float kTutorialBouncePower = 25.0f;
+
 			//==========================================
 			// 現在のステージセットを更新
 			//==========================================
 			stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
-			//==========================================
-			// 更新処理
-			// =========================================
 
-			// 自動前進
-			player.worldLeftTop.posX += kMoveSpeed;
-
-			if (keys[DIK_A]) {
-				player.worldLeftTop.posX -= 30.0f;
-			}
-
-			//==========================================
-			// スクロール計算（敵の更新で使うため先行計算）
-			//==========================================
-			scrollValue =
-				player.worldLeftTop.posX +
-				player.size.posX - scrollStartPositionX;
-
-			if (scrollValue < 0.0f) {
-				scrollValue = 0.0f;
-			}
-
-			// シャチ（敵）の更新処理
-			if (enemy.isActive) {
-				enemy.position.posX -= enemy.speed;
-
-				// 画像の右端が完全に画面の左外側（scrollValue）を出たら再出現
-				if (enemy.position.posX + enemy.size.posX < scrollValue) {
-					enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-					enemy.position.posY = 300.0f;
+			// ジャンプ中、最高点付近（Y速度が-2.0f以上）になったら一時停止を発動
+			if (isWaitingForPeak && !isStartGuideDone) {
+				if (playerVelocityY >= -2.0f) {
+					isTutorialPaused = true;
+					tutorialPauseType = 0;
+					isWaitingForPeak = false;
 				}
 			}
 
-			// ジャンプ
-			if (preKeys[DIK_SPACE] == 0 &&
-				keys[DIK_SPACE] != 0 &&
-				jumpCount < kMaxJumpCount) {
-
-				playerVelocityY = -kJumpPower;
-				isJumping = true;
-				jumpCount++;
-
-				if (jumpSound != -1) {
-					Novice::PlayAudio(
-						jumpSound, false, 0.8f
-					);
+			// トランポリン接近時のチェック（まだガイドを行っていない場合）
+			if (!isTrampolineGuideDone && !isTutorialPaused && isStartGuideDone) {
+				float firstTrampolineX = trampolinePositions[0].posX;
+				// 最初のトランポリン手前300pxまで接近したら一時停止
+				if (player.worldLeftTop.posX >= firstTrampolineX - 300.0f) {
+					isTutorialPaused = true;
+					tutorialPauseType = 1; // 1: トランポリン前ポーズ
 				}
 			}
 
-			// ジャンプアニメーション
-			if (isJumping) {
+			// ガイドポーズ中のキー操作（SPACEで解除して次のジャンプ）
+			if (isTutorialPaused) {
+				if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0) {
+					if (tutorialPauseType == 0) {
+						// 【開始時空中ジャンプガイド】
+						if (tutorialStep <= 3) {
+							playerVelocityY = -kJumpPower;
+							isJumping = true;
+							jumpCount = tutorialStep;
+							isTutorialPaused = false; // 一旦動かして最高点まで飛ばす
+							isWaitingForPeak = true;
 
-				jumpAnimationTimer++;
-
-				if (jumpAnimationTimer >= 10) {
-
-					jumpAnimationTimer = 0;
-					jumpFrame =
-						(jumpFrame + 1) % kJumpFrameCount;
-				}
-			}
-
-			float previousPlayerBottom =
-				player.worldLeftTop.posY + player.size.posY;
-
-			// 重力
-			if (isJumping) {
-
-				playerVelocityY += kGravity;
-				player.worldLeftTop.posY += playerVelocityY;
-			}
-
-			//==========================================
-			// トランポリン判定
-			//==========================================
-			int collisionStageSet =
-				static_cast<int>(
-					player.worldLeftTop.posX / kStageWidth
-					);
-
-			for (int set = collisionStageSet - 1;
-				set <= collisionStageSet + 1; set++) {
-
-				for (int i = 0; i < kTrampolineCount; i++) {
-
-					float trampolineX =
-						trampolinePositions[i].posX +
-						set * kStageWidth;
-
-					float trampolineY =
-						trampolinePositions[i].posY + kTrampolineOffsetY;
-
-					float playerRight =
-						player.worldLeftTop.posX +
-						player.size.posX;
-
-					float playerBottom =
-						player.worldLeftTop.posY +
-						player.size.posY;
-
-					bool isOverlapX =
-						player.worldLeftTop.posX <
-						trampolineX + kTrampolineWidth &&
-						playerRight > trampolineX;
-
-					bool isLanding =
-						previousPlayerBottom <= trampolineY &&
-						playerBottom >= trampolineY;
-
-					if (playerVelocityY > 0.0f &&
-						isOverlapX && isLanding) {
-
-						player.worldLeftTop.posY =
-							trampolineY - player.size.posY;
-
-						playerVelocityY =
-							-kTrampolineBouncePower;
-
-						// トランポリンを踏んだ場所から粒を飛ばす
-						float particleCenterX =
-							trampolineX + kTrampolineWidth / 2.0f;
-
-						float particleCenterY = trampolineY;
-
-						int spawnedCount = 0;
-
-						for (int p = 0; p < kMaxParticles; p++)
-						{
-							if (!particles[p].isActive)
-							{
-								// 左右に広がりながら上に飛ぶ
-								float angle =
-									3.1415926f +
-									(3.1415926f / 7.0f) * spawnedCount;
-
-								particles[p].position = {
-									particleCenterX,
-									particleCenterY
-								};
-
-								particles[p].velocity = {
-									cosf(angle) * 6.0f,
-									sinf(angle) * 6.0f
-								};
-
-								particles[p].timer = 0;
-								particles[p].lifeTime = 18;
-								particles[p].radius = 6.0f;
-								particles[p].color = 0xA0A0A0FF; // 灰色
-								particles[p].isActive = true;
-
-								spawnedCount++;
-
-								if (spawnedCount >= 8)
-								{
-									break;
-								}
+							if (jumpSound != -1) {
+								Novice::PlayAudio(jumpSound, false, 0.8f);
 							}
+
+							if (tutorialStep == 3) {
+								// 3回目のジャンプを出したらガイド全工程完了
+								isStartGuideDone = true;
+								isWaitingForPeak = false;
+							}
+
+							tutorialStep++;
 						}
+					}
+					else if (tutorialPauseType == 1) {
+						// 【トランポリン前ガイド】
+						isTutorialPaused = false;
+						isTrampolineGuideDone = true;
 
+						// そのままジャンプ開始
+						playerVelocityY = -kJumpPower;
 						isJumping = true;
+						jumpCount = 1;
 
-						if (trampolineSound != -1) {
-							Novice::PlayAudio(
-								trampolineSound, false, 0.8f
-							);
+						if (jumpSound != -1) {
+							Novice::PlayAudio(jumpSound, false, 0.8f);
 						}
 					}
 				}
 			}
 
-			// 地面判定 (足元に合わせて調整)
-			if (player.worldLeftTop.posY >= kGroundY + kPlayerOffsetY) {
-
-				player.worldLeftTop.posY = kGroundY + kPlayerOffsetY;
-				playerVelocityY = 0.0f;
-				isJumping = false;
-				jumpCount = 0;
-			}
-
 			//==========================================
-			// コイン判定
-			//==========================================
-			int coinCollisionStageSet =
-				static_cast<int>(
-					player.worldLeftTop.posX / kStageWidth
-					);
+			// 更新処理（非ポーズ時のみ実行）
+			// =========================================
+			if (!isTutorialPaused) {
 
-			for (int set = coinCollisionStageSet - 1;
-				set <= collisionStageSet + 1; set++) {
+				// 自動前進
+				player.worldLeftTop.posX += kMoveSpeed;
 
-				if (set < 0 || set >= kMaxCoinStageSets) {
-					continue;
+				if (keys[DIK_A]) {
+					player.worldLeftTop.posX -= 30.0f;
 				}
 
-				for (int y = 0; y < kCoinMapHeight; y++) {
-					for (int x = 0; x < kCoinMapWidth; x++) {
+				//==========================================
+				// スクロール計算（敵の更新で使うため先行計算）
+				//==========================================
+				scrollValue =
+					player.worldLeftTop.posX +
+					player.size.posX - scrollStartPositionX;
 
-						if (coinMap[y][x] != 1 ||
-							coinCollectedByStage[set][y][x]) {
-							continue;
-						}
+				if (scrollValue < 0.0f) {
+					scrollValue = 0.0f;
+				}
 
-						// ★コイン(64x64)の判定を中央寄り(48x48)にずらして配置
-						float coinX =
-							x * kCoinMapSize + set * kStageWidth + 8.0f;
+				// シャチ（敵）の更新処理
+				if (enemy.isActive) {
+					enemy.position.posX -= enemy.speed;
 
-						float coinY =
-							static_cast<float>(y * kCoinMapSize) + 8.0f;
+					// 画像の右端が完全に画面の左外側（scrollValue）を出たら再出現
+					if (enemy.position.posX + enemy.size.posX < scrollValue) {
+						enemy.position.posX = scrollValue + 1280.0f + 200.0f;
+						enemy.position.posY = 420.0f;
+						enemy.hasTrampoline = true;
+					}
+				}
+
+				// ジャンプ（開始ガイド後から1つ目のトランポリン前までは自由ジャンプを禁止）
+				if (preKeys[DIK_SPACE] == 0 &&
+					keys[DIK_SPACE] != 0 &&
+					jumpCount < kMaxJumpCount &&
+					!isWaitingForPeak &&
+					(!isStartGuideDone || isTrampolineGuideDone)) {
+
+					playerVelocityY = -kJumpPower;
+					isJumping = true;
+					jumpCount++;
+
+					if (jumpSound != -1) {
+						Novice::PlayAudio(
+							jumpSound, false, 0.8f
+						);
+					}
+				}
+
+				// ジャンプアニメーション
+				if (isJumping) {
+
+					jumpAnimationTimer++;
+
+					if (jumpAnimationTimer >= 10) {
+
+						jumpAnimationTimer = 0;
+						jumpFrame =
+							(jumpFrame + 1) % kJumpFrameCount;
+					}
+				}
+
+				float previousPlayerBottom =
+					player.worldLeftTop.posY + player.size.posY;
+
+				// 重力
+				if (isJumping) {
+
+					playerVelocityY += kGravity;
+					player.worldLeftTop.posY += playerVelocityY;
+				}
+
+				//==========================================
+				// トランポリン判定（チュートリアル用調整）
+				//==========================================
+				int collisionStageSet =
+					static_cast<int>(
+						player.worldLeftTop.posX / kStageWidth
+						);
+
+				for (int set = collisionStageSet - 1;
+					set <= collisionStageSet + 1; set++) {
+
+					for (int i = 0; i < kTrampolineCount; i++) {
+
+						float trampolineX =
+							trampolinePositions[i].posX +
+							set * kStageWidth;
+
+						float trampolineY =
+							trampolinePositions[i].posY + kTrampolineOffsetY;
 
 						float playerRight =
 							player.worldLeftTop.posX +
@@ -2450,61 +2586,222 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							player.worldLeftTop.posY +
 							player.size.posY;
 
-						if (player.worldLeftTop.posX <
-							coinX + kCoinSize &&
-							playerRight > coinX &&
-							player.worldLeftTop.posY <
-							coinY + kCoinSize &&
-							playerBottom > coinY) {
+						bool isOverlapX =
+							player.worldLeftTop.posX <
+							trampolineX + kTrampolineWidth &&
+							playerRight > trampolineX;
 
-							coinCollectedByStage[set][y][x] = true;
-							coinCount++;
+						bool isLanding =
+							previousPlayerBottom <= trampolineY &&
+							playerBottom >= trampolineY;
 
-							// コインを取った場所から黄色い粒を発生
-							for (int i = 0; i < kMaxParticles; i++)
+						if (playerVelocityY > 0.0f &&
+							isOverlapX && isLanding) {
+
+							player.worldLeftTop.posY =
+								trampolineY - player.size.posY;
+
+							playerVelocityY =
+								-kTutorialBouncePower; // 弱めの跳ね返り力を適用
+
+							// トランポリンを踏んだ場所から粒を飛ばす
+							float particleCenterX =
+								trampolineX + kTrampolineWidth / 2.0f;
+
+							float particleCenterY = trampolineY;
+
+							int spawnedCount = 0;
+
+							for (int p = 0; p < kMaxParticles; p++)
 							{
-								if (!particles[i].isActive)
+								if (!particles[p].isActive)
 								{
-									float coinCenterX = coinX + kCoinSize / 2.0f;
-									float coinCenterY = coinY + kCoinSize / 2.0f;
-
+									// 左右に広がりながら上に飛ぶ
 									float angle =
-										(6.2831853f / kMaxParticles) * i;
+										3.1415926f +
+										(3.1415926f / 7.0f) * spawnedCount;
 
-									particles[i].position = {
-										coinCenterX,
-										coinCenterY
+									particles[p].position = {
+										particleCenterX,
+										particleCenterY
 									};
 
-									particles[i].velocity = {
-										cosf(angle) * 5.0f,
-										sinf(angle) * 5.0f
+									particles[p].velocity = {
+										cosf(angle) * 6.0f,
+										sinf(angle) * 6.0f
 									};
 
-									particles[i].timer = 0;
-									particles[i].lifeTime = kParticleLifeTime;
-									particles[i].radius = 5.0f;
-									particles[i].isActive = true;
+									particles[p].timer = 0;
+									particles[p].lifeTime = 18;
+									particles[p].radius = 6.0f;
+									particles[p].color = 0xA0A0A0FF; // 灰色
+									particles[p].isActive = true;
 
-									break;
+									spawnedCount++;
+
+									if (spawnedCount >= 8)
+									{
+										break;
+									}
 								}
 							}
 
-							if (coinSound != -1) {
+							isJumping = true;
+							jumpCount = 0; // トランポリンで空中ジャンプ回数をリセット
+
+							if (trampolineSound != -1) {
 								Novice::PlayAudio(
-									coinSound, false, 0.8f
+									trampolineSound, false, 0.8f
 								);
 							}
+						}
+					}
+				}
+
+				// 地面判定 (足元に合わせて調整)
+				if (player.worldLeftTop.posY >= kGroundY + kPlayerOffsetY) {
+
+					player.worldLeftTop.posY = kGroundY + kPlayerOffsetY;
+					playerVelocityY = 0.0f;
+					isJumping = false;
+					jumpCount = 0;
+				}
+
+				//==========================================
+				// コイン判定
+				//==========================================
+				int coinCollisionStageSet =
+					static_cast<int>(
+						player.worldLeftTop.posX / kStageWidth
+						);
+
+				for (int set = coinCollisionStageSet - 1;
+					set <= collisionStageSet + 1; set++) {
+
+					if (set < 0 || set >= kMaxCoinStageSets) {
+						continue;
+					}
+
+					for (int y = 0; y < kCoinMapHeight; y++) {
+						for (int x = 0; x < kCoinMapWidth; x++) {
+
+							if (coinMap[y][x] != 1 ||
+								coinCollectedByStage[set][y][x]) {
+								continue;
+							}
+
+							// ★コイン(64x64)の判定を中央寄り(48x48)にずらして配置
+							float coinX =
+								x * kCoinMapSize + set * kStageWidth + 8.0f;
+
+							float coinY =
+								static_cast<float>(y * kCoinMapSize) + 8.0f;
+
+							float playerRight =
+								player.worldLeftTop.posX +
+								player.size.posX;
+
+							float playerBottom =
+								player.worldLeftTop.posY +
+								player.size.posY;
+
+							if (player.worldLeftTop.posX <
+								coinX + kCoinSize &&
+								playerRight > coinX &&
+								player.worldLeftTop.posY <
+								coinY + kCoinSize &&
+								playerBottom > coinY) {
+
+								coinCollectedByStage[set][y][x] = true;
+								coinCount++;
+
+								// コインを取った場所から黄色い粒を発生
+								for (int i = 0; i < kMaxParticles; i++)
+								{
+									if (!particles[i].isActive)
+									{
+										float coinCenterX = coinX + kCoinSize / 2.0f;
+										float coinCenterY = coinY + kCoinSize / 2.0f;
+
+										float angle =
+											(6.2831853f / kMaxParticles) * i;
+
+										particles[i].position = {
+											coinCenterX,
+											coinCenterY
+										};
+
+										particles[i].velocity = {
+											cosf(angle) * 5.0f,
+											sinf(angle) * 5.0f
+										};
+
+										particles[i].timer = 0;
+										particles[i].lifeTime = kParticleLifeTime;
+										particles[i].radius = 5.0f;
+										particles[i].isActive = true;
+
+										break;
+									}
+								}
+
+								if (coinSound != -1) {
+									Novice::PlayAudio(
+										coinSound, false, 0.8f
+									);
+								}
+							}
+						}
+					}
+				}
+
+				//=================================
+				// パーティクル更新
+				//=================================
+				for (int i = 0; i < kMaxParticles; i++)
+				{
+					if (particles[i].isActive)
+					{
+						particles[i].position.posX +=
+							particles[i].velocity.posX;
+
+						particles[i].position.posY +=
+							particles[i].velocity.posY;
+
+						// 少しずつ減速
+						particles[i].velocity.posX *= 0.95f;
+						particles[i].velocity.posY *= 0.95f;
+
+						// 少しずつ小さくする
+						particles[i].radius *= 0.96f;
+
+						particles[i].timer++;
+
+						if (particles[i].timer >= particles[i].lifeTime)
+						{
+							particles[i].isActive = false;
 						}
 					}
 				}
 			}
 
 			//==========================================
-			// スクロール
+			// スクロール計算（描画用）
 			//==========================================
+			scrollValue =
+				player.worldLeftTop.posX +
+				player.size.posX - scrollStartPositionX;
+
+			if (scrollValue < 0.0f) {
+				scrollValue = 0.0f;
+			}
+
 			float loopScroll =
 				fmodf(scrollValue, kBackgroundWidth);
+
+			//================================
+			//チュートリアル描画処理
+			//================================
 
 			// 背景
 			for (int i = 0; i < 8; i++) {
@@ -2526,40 +2823,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			//=================================
-			// パーティクル更新
-			//=================================
-			for (int i = 0; i < kMaxParticles; i++)
-			{
-				if (particles[i].isActive)
-				{
-					particles[i].position.posX +=
-						particles[i].velocity.posX;
+			// シャチ（敵）の描画
+			if (enemy.isActive && enemyTexture != -1) {
+				Novice::DrawSprite(
+					static_cast<int>(enemy.position.posX - scrollValue),
+					static_cast<int>(enemy.position.posY),
+					enemyTexture,
+					1.0f, 1.0f, 0.0f, WHITE
+				);
 
-					particles[i].position.posY +=
-						particles[i].velocity.posY;
+				// ★チュートリアルでも hasTrampoline が true なら描画
+				if (enemy.hasTrampoline && trampoline != -1) {
+					Novice::DrawSprite(
+						static_cast<int>(enemy.position.posX - scrollValue),
+						static_cast<int>(enemy.position.posY - 60.0f),
+						trampoline,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
+				}
 
-					// 少しずつ減速
-					particles[i].velocity.posX *= 0.95f;
-					particles[i].velocity.posY *= 0.95f;
+				// ★【デバッグ用】チュートリアル中のシャチ本体の当たり判定枠を赤線で表示
+				Novice::DrawBox(
+					static_cast<int>(enemy.position.posX - scrollValue),
+					static_cast<int>(enemy.position.posY),
+					static_cast<int>(enemy.size.posX),
+					static_cast<int>(enemy.size.posY),
+					0.0f,
+					0xFF0000FF, // 赤色 (RGBA)
+					kFillModeWireFrame
+				);
 
-					// 少しずつ小さくする
-					particles[i].radius *= 0.96f;
-
-					particles[i].timer++;
-
-					if (particles[i].timer >= particles[i].lifeTime)
-					{
-						particles[i].isActive = false;
-					}
+				// ★【デバッグ用】チュートリアル中のトランポリン判定ゾーンを赤線で表示
+				if (enemy.hasTrampoline) {
+					Novice::DrawBox(
+						static_cast<int>(enemy.position.posX - scrollValue),
+						static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY),
+						kTrampolineWidth,
+						20, // 跳ね返り高さの判定幅
+						0.0f,
+						0xFF0000FF, // 赤色 (RGBA)
+						kFillModeWireFrame
+					);
 				}
 			}
-
-			//================================
-			//================================
-			//チュートリアル描画処理
-			//================================
-			//================================
 
 			// トランポリン描画
 			for (int set = stageSet - 1;
@@ -2718,16 +3024,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 			}
 
-			// シャチ（敵）の描画
-			if (enemy.isActive && enemyTexture != -1) {
-				Novice::DrawSprite(
-					static_cast<int>(enemy.position.posX - scrollValue),
-					static_cast<int>(enemy.position.posY),
-					enemyTexture,
-					1.0f, 1.0f, 0.0f, WHITE
-				);
-			}
-
 			// プレイヤー描画
 			if (isJumping && playerJumpTexture != -1) {
 
@@ -2762,6 +3058,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
 			}
 			Novice::ScreenPrintf(1130, 25, "x %d", coinCount);
+
+			//==========================================
+			// チュートリアルガイド表示（ポーズ中）
+			//==========================================
+			if (isTutorialPaused) {
+				// 画面暗転オーバーレイ
+				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x00000088, kFillModeSolid);
+
+				// ガイド枠・テキスト表示
+				Novice::DrawBox(340, 260, 600, 200, 0.0f, 0x111133DD, kFillModeSolid);
+				Novice::DrawBox(340, 260, 600, 200, 0.0f, WHITE, kFillModeWireFrame);
+
+				if (tutorialPauseType == 0) {
+					// 【開始時空中ジャンプガイド】
+					if (tutorialStep == 1) {
+						Novice::ScreenPrintf(460, 310, "PRESS SPACE TO 1ST JUMP!");
+					}
+					else if (tutorialStep == 2) {
+						Novice::ScreenPrintf(460, 310, "1ST JUMP!");
+						Novice::ScreenPrintf(410, 350, "PRESS SPACE TO 2ND JUMP!");
+					}
+					else if (tutorialStep == 3) {
+						Novice::ScreenPrintf(460, 310, "2ND JUMP!");
+						Novice::ScreenPrintf(410, 350, "PRESS SPACE TO 3RD JUMP!");
+					}
+				}
+				else if (tutorialPauseType == 1) {
+					// 【トランポリン前ガイド】
+					Novice::ScreenPrintf(460, 310, "TRAMPOLINE AHEAD!");
+					Novice::ScreenPrintf(410, 350, "PRESS SPACE TO JUMP!");
+				}
+			}
 
 			break;
 		}
