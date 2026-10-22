@@ -10,6 +10,7 @@ const char kWindowTitle[] = "LC1D_12_タカハシ";
 enum GameShene
 {
 	Title,
+	SelectStage, // ステージ選択画面を追加
 	Game,
 	tutorial,
 	BonusStage,
@@ -65,7 +66,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const float kPlayerOffsetX = (kPlayerDrawSize - player.size.posX) * 0.5f;
 	const float kPlayerOffsetY = (kPlayerDrawSize - player.size.posY) * 0.5f;
 
-	const float kMoveSpeed = 10.0f;
+	float kMoveSpeed = 10.0f;
 	const float kStageWidth = 1280.0f * 4.0f;
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
@@ -144,6 +145,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	int enemyTexture =
 		Novice::LoadTexture("./Resources/images/enemy.png");
+	// タコ（ステージ3用敵）
+	int octopusTexture =
+		Novice::LoadTexture("./Resources/images/octopus.png");
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
@@ -256,6 +260,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	float secretX = 0.0f;
 	int secretAnimationTimer = 0;
 	int secretCurrentFrame = 0;
+
 	//==========================================
 	// 敵（シャチ）の設定
 	//==========================================
@@ -271,9 +276,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	Enemy enemy{};
 	enemy.size = { 256.0f, 128.0f }; // サイズ256x128
 	enemy.speed = 8.0f; // 移動速度
-	enemy.position = { 1280.0f + 200.0f, 420.0f };
+	enemy.position = { 1280.0f + 200.0f, 480.0f }; // シャチのY位置をさらに下に調整
 	enemy.isActive = true;
 	enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付き
+
+	//==========================================
+	// ステージ3用敵（タコ）の設定
+	//==========================================
+	struct Octopus
+	{
+		Vector2 position;
+		Vector2 size;
+		float speed;
+		bool isActive;
+		int shakeTimer; // 画面揺らし用タイマー
+	};
+
+	Octopus octopus{};
+	octopus.size = { 128.0f, 128.0f };
+	octopus.speed = 14.0f; // 右から左に移動してくるスピード
+	octopus.position = { 1280.0f + 300.0f, 250.0f }; // 初期出現位置（画面外の右）
+	octopus.isActive = false;
+	octopus.shakeTimer = 0;
+
+	// 画面シェイク（揺れ）オフセット値
+	float shakeOffsetX = 0.0f;
+	float shakeOffsetY = 0.0f;
 
 	//==========================================
 	// 効果音
@@ -326,6 +354,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		titlePlayHandle =
 			Novice::PlayAudio(kTitleHandle, true, 0.5f);
 	}
+
+	//==========================================
+	// ステージ選択用変数
+	//==========================================
+	int selectedStage = 0; // 0: STAGE 1, 1: STAGE 2, 2: STAGE 3
 
 	//==========================================
 	// トランポリン
@@ -607,6 +640,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						isSpeedBoostActive = false;
 						hasSpeedBoostTriggered = false;
 						speedBoostTimer = 0;
+						octopus.isActive = false;
 
 						memset(starConditions, 0, sizeof(starConditions));
 						memcpy(coinMap, initialCoinMap, sizeof(coinMap));
@@ -798,24 +832,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							shouldExit = true;
 						}
 						else if (selectedMenu == 0) {
-							scene = Game;
-
-							// ライフと無敵時間を初期化
-							playerLife = 3;
-							isInvincible = false;
-							invincibleTimer = 0;
-
-							// 通常ゲーム開始時の位置セット
-							player.worldLeftTop = { 10.0f, 500.0f };
-							enemy.position = { 1280.0f + 200.0f, 420.0f };
-							enemy.isActive = true;
-							enemy.hasTrampoline = (rand() % 2 == 0); // スタート時のシャチの種類をランダム決定
-
-							// ステージBGMを再生
-							if (kStageHandle != -1) {
-								stagePlayHandle =
-									Novice::PlayAudio(kStageHandle, true, 1.0f);
-							}
+							scene = SelectStage; // ゲーム開始の前にステージ選択へ移行
 						}
 						else if (selectedMenu == 1) {
 
@@ -827,9 +844,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							isJumping = false;
 							jumpCount = 0;
 
-							enemy.position = { 1000.0f, 420.0f };
+							enemy.position = { 1000.0f, 480.0f }; // シャチのY位置をさらに下に調整
 							enemy.isActive = false;
 							enemy.hasTrampoline = true; // チュートリアルはトランポリン付きで固定
+
+							octopus.isActive = false;
 
 							// 最初は画面停止（ポーズ）でプレイヤーのSPACE開始入力を待つ
 							isTutorialPaused = true;
@@ -1074,8 +1093,120 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 
 					  //==========================================
-					  // 通常ゲーム
+					  // ステージ選択画面
 					  //==========================================
+			case SelectStage: {
+				// 左移動
+				if ((preKeys[DIK_LEFT] == 0 && keys[DIK_LEFT] != 0) ||
+					(preKeys[DIK_A] == 0 && keys[DIK_A] != 0)) {
+					selectedStage = (selectedStage + 2) % 3;
+					if (cursorSound != -1) {
+						Novice::PlayAudio(cursorSound, false, 0.8f);
+					}
+				}
+
+				// 右移動
+				if ((preKeys[DIK_RIGHT] == 0 && keys[DIK_RIGHT] != 0) ||
+					(preKeys[DIK_D] == 0 && keys[DIK_D] != 0)) {
+					selectedStage = (selectedStage + 1) % 3;
+					if (cursorSound != -1) {
+						Novice::PlayAudio(cursorSound, false, 0.8f);
+					}
+				}
+
+				// 決定
+				if (preKeys[DIK_SPACE] == 0 && keys[DIK_SPACE] != 0) {
+					if (pushSound != -1) {
+						Novice::PlayAudio(pushSound, false, 0.8f);
+					}
+
+					// 選択したステージパラメータを初期化
+					if (selectedStage == 0) { // STAGE 1 (NORMAL)
+						kMoveSpeed = 10.0f;
+						playerLife = 3;
+						enemy.speed = 8.0f;
+						enemy.isActive = true;
+						octopus.isActive = false;
+					}
+					else if (selectedStage == 1) { // STAGE 2 (HIGH SPEED)
+						kMoveSpeed = 14.0f;
+						playerLife = 3;
+						enemy.speed = 10.0f;
+						enemy.isActive = true;
+						octopus.isActive = false;
+					}
+					else if (selectedStage == 2) { // STAGE 3 (HARD)
+						kMoveSpeed = 12.0f;
+						playerLife = 1;
+						enemy.speed = 12.0f;
+
+						// ★ステージ3限定：シャチ非表示、タコアクティブ
+						enemy.isActive = false;
+						octopus.isActive = true;
+						octopus.position = { 1280.0f + 300.0f, 250.0f };
+						octopus.shakeTimer = 30; // 登場時に約0.5秒画面揺らし
+					}
+
+					scene = Game;
+
+					// ライフと無敵時間を初期化
+					isInvincible = false;
+					invincibleTimer = 0;
+
+					// 通常ゲーム開始時の位置セット
+					player.worldLeftTop = { 10.0f, 500.0f };
+					enemy.position = { 1280.0f + 200.0f, 480.0f }; // シャチのY位置をさらに下に調整
+					if (selectedStage != 2) {
+						enemy.isActive = true;
+					}
+					enemy.hasTrampoline = (rand() % 2 == 0);
+
+					// ステージBGMを再生
+					if (kStageHandle != -1) {
+						stagePlayHandle = Novice::PlayAudio(kStageHandle, true, 1.0f);
+					}
+				}
+
+				// 描画
+				if (backgroundTexture != -1) {
+					Novice::DrawSprite(0, 0, backgroundTexture, 1.0f, 1.0f, 0.0f, WHITE);
+				}
+
+				Novice::ScreenPrintf(550, 120, "SELECT STAGE");
+
+				const int stageBoxX[3] = { 180, 500, 820 };
+				const int stageBoxY = 260;
+				const int boxW = 280;
+				const int boxH = 260;
+
+				const char* stageNames[3] = { "STAGE 1", "STAGE 2", "STAGE 3" };
+				const char* stageDescs[3] = { "NORMAL", "HIGH SPEED", "HARD" };
+
+				for (int i = 0; i < 3; i++) {
+					unsigned int boxColor = (i == selectedStage) ? 0xFFDD00FF : 0x444466FF;
+					Novice::DrawBox(stageBoxX[i], stageBoxY, boxW, boxH, 0.0f, boxColor, kFillModeSolid);
+					Novice::DrawBox(stageBoxX[i], stageBoxY, boxW, boxH, 0.0f, WHITE, kFillModeWireFrame);
+
+					Novice::ScreenPrintf(stageBoxX[i] + 100, stageBoxY + 40, "%s", stageNames[i]);
+					Novice::ScreenPrintf(stageBoxX[i] + 90, stageBoxY + 120, "%s", stageDescs[i]);
+
+					if (i == selectedStage) {
+						if (selectArrowTexture != -1) {
+							Novice::DrawSprite(stageBoxX[i] + 108, stageBoxY - 45, selectArrowTexture, 1.0f, 1.0f, 0.0f, WHITE);
+						}
+					}
+				}
+
+				if (pushSpaceTexture != -1 && (timer / 30) % 2 == 0) {
+					Novice::DrawSprite(500, 580, pushSpaceTexture, 2.0f, 2.0f, 0.0f, WHITE);
+				}
+
+				break;
+			}
+
+							//==========================================
+							// 通常ゲーム
+							//==========================================
 
 			case Game: {
 				//==========================================
@@ -1136,6 +1267,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 
 				//==========================================
+				// 画面シェイク（揺れ）の計算
+				//==========================================
+				shakeOffsetX = 0.0f;
+				shakeOffsetY = 0.0f;
+				if (octopus.shakeTimer > 0) {
+					octopus.shakeTimer--;
+					shakeOffsetX = static_cast<float>((rand() % 21) - 10);
+					shakeOffsetY = static_cast<float>((rand() % 21) - 10);
+				}
+
+				//==========================================
 				// シャチ（敵）の更新処理
 				//==========================================
 				if (enemy.isActive && !isGameClear) {
@@ -1145,7 +1287,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
 					if (enemy.position.posX + enemy.size.posX < scrollValue) {
 						enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-						enemy.position.posY = 420.0f;
+						enemy.position.posY = 480.0f; // シャチのY位置をさらに下に調整
 						enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付きにランダム変更
 					}
 
@@ -1180,6 +1322,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							isInvincible = true;
 							invincibleTimer = 0;
 						}
+					}
+				}
+
+				//==========================================
+				// タコ（ステージ3敵）の更新処理 (ボス演出)
+				//==========================================
+				if (octopus.isActive && !isGameClear) {
+					// 画面右端から約400px左（画面右側寄り・見切れずしっかり入る位置）で停止
+					float stopX = scrollValue + 1280.0f - octopus.size.posX - 400.0f;
+
+					if (octopus.position.posX > stopX) {
+						octopus.position.posX -= octopus.speed;
+						if (octopus.position.posX < stopX) {
+							octopus.position.posX = stopX;
+						}
+					}
+					else {
+						// 停止位置をキープしながら画面スクロールに追従
+						octopus.position.posX = stopX;
 					}
 				}
 
@@ -1536,25 +1697,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						backgroundTexture != -1) {
 
 						Novice::DrawSprite(
-							static_cast<int>(backgroundX),
-							0,
+							static_cast<int>(backgroundX + shakeOffsetX),
+							static_cast<int>(0 + shakeOffsetY),
 							backgroundTexture,
 							1.0f, 1.0f, 0.0f, WHITE
 						);
 					}
 				}
 
-				static_cast<int>(
-					player.worldLeftTop.posX / kStageWidth
-					);
-
 				// 背景
 				for (int i = 0; i < 4; i++) {
 
 					if (backgroundTexture != -1) {
 						Novice::DrawSprite(
-							static_cast<int>(1280.0f * i - scrollValue),
-							0,
+							static_cast<int>(1280.0f * i - scrollValue + shakeOffsetX),
+							static_cast<int>(0 + shakeOffsetY),
 							backgroundTexture,
 							1.0f, 1.0f, 0.0f, WHITE
 						);
@@ -1567,10 +1724,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (trampoline != -1) {
 						Novice::DrawSprite(
 							static_cast<int>(
-								trampolinePositions[i].posX - scrollValue
+								trampolinePositions[i].posX - scrollValue + shakeOffsetX
 								),
 							static_cast<int>(
-								trampolinePositions[i].posY
+								trampolinePositions[i].posY + shakeOffsetY
 								),
 							trampoline,
 							1.0f, 1.0f, 0.0f, WHITE
@@ -1599,7 +1756,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								set * kStageWidth;
 
 							int screenX =
-								static_cast<int>(coinX - scrollValue);
+								static_cast<int>(coinX - scrollValue + shakeOffsetX);
 
 							if (screenX + kCoinSize < 0 ||
 								screenX > 1280) {
@@ -1609,7 +1766,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							if (coin != -1) {
 								Novice::DrawSprite(
 									screenX,
-									y * kCoinMapSize,
+									static_cast<int>(y * kCoinMapSize + shakeOffsetY),
 									coin,
 									1.0f, 1.0f, 0.0f, WHITE
 								);
@@ -1624,9 +1781,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (particles[i].isActive)
 					{
 						float screenX =
-							particles[i].position.posX - scrollValue;
+							particles[i].position.posX - scrollValue + shakeOffsetX;
 						float screenY =
-							particles[i].position.posY;
+							particles[i].position.posY + shakeOffsetY;
 
 						// 外側
 						Novice::DrawEllipse(
@@ -1654,20 +1811,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				// かまくらと旗（旗は192x48、48x48の4コマ）
 				if (goalHouseTexture != -1) {
-					Novice::DrawSprite(static_cast<int>(kGoalX - scrollValue),
-						static_cast<int>(kGoalY), goalHouseTexture, 1.0f, 1.0f, 0.0f, WHITE);
+					Novice::DrawSprite(static_cast<int>(kGoalX - scrollValue + shakeOffsetX),
+						static_cast<int>(kGoalY + shakeOffsetY), goalHouseTexture, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 				if (goalFlagTexture != -1) {
-					Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue),
-						static_cast<int>(kGoalY + 28.0f), goalFlagFrame * 48, 0,
+					Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue + shakeOffsetX),
+						static_cast<int>(kGoalY + 28.0f + shakeOffsetY), goalFlagFrame * 48, 0,
 						48, 48, goalFlagTexture, 0.375f, 1.5f, 0.0f, WHITE);
 				}
 
 				// シャチ（敵）の描画
 				if (enemy.isActive && enemyTexture != -1) {
 					Novice::DrawSprite(
-						static_cast<int>(enemy.position.posX - scrollValue),
-						static_cast<int>(enemy.position.posY),
+						static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
+						static_cast<int>(enemy.position.posY + shakeOffsetY),
 						enemyTexture,
 						1.0f, 1.0f, 0.0f, WHITE
 					);
@@ -1675,8 +1832,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// ★hasTrampoline が true の時だけ真上にトランポリンを描画
 					if (enemy.hasTrampoline && trampoline != -1) {
 						Novice::DrawSprite(
-							static_cast<int>(enemy.position.posX - scrollValue),
-							static_cast<int>(enemy.position.posY - 60.0f),
+							static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
+							static_cast<int>(enemy.position.posY - 60.0f + shakeOffsetY),
 							trampoline,
 							1.0f, 1.0f, 0.0f, WHITE
 						);
@@ -1684,8 +1841,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 					// ★【デバッグ用】シャチ本体の当たり判定枠を赤線で表示
 					Novice::DrawBox(
-						static_cast<int>(enemy.position.posX - scrollValue),
-						static_cast<int>(enemy.position.posY),
+						static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
+						static_cast<int>(enemy.position.posY + shakeOffsetY),
 						static_cast<int>(enemy.size.posX),
 						static_cast<int>(enemy.size.posY),
 						0.0f,
@@ -1696,8 +1853,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// ★【デバッグ用】トランポリン判定ゾーンを赤線で表示（hasTrampolineがtrueの時のみ）
 					if (enemy.hasTrampoline) {
 						Novice::DrawBox(
-							static_cast<int>(enemy.position.posX - scrollValue),
-							static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY),
+							static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
+							static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY + shakeOffsetY),
 							kTrampolineWidth,
 							20, // 跳ね返り高さの判定幅
 							0.0f,
@@ -1705,6 +1862,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							kFillModeWireFrame
 						);
 					}
+				}
+
+				// ★タコ（ステージ3用敵）の描画 (ボス演出)
+				if (octopus.isActive && octopusTexture != -1) {
+					Novice::DrawSprite(
+						static_cast<int>(octopus.position.posX - scrollValue + shakeOffsetX),
+						static_cast<int>(octopus.position.posY + shakeOffsetY),
+						octopusTexture,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
 				}
 
 				// ★プレイヤー描画（無敵時間中の点滅処理を考慮）
@@ -1718,9 +1885,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 						Novice::DrawSpriteRect(
 							static_cast<int>(
-								player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
+								player.worldLeftTop.posX - kPlayerOffsetX - scrollValue + shakeOffsetX
 								),
-							static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
+							static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY + shakeOffsetY),
 							jumpFrame * 128,
 							0,
 							128, 128,
@@ -1734,9 +1901,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 						Novice::DrawSprite(
 							static_cast<int>(
-								player.worldLeftTop.posX - kPlayerOffsetX - scrollValue
+								player.worldLeftTop.posX - kPlayerOffsetX - scrollValue + shakeOffsetX
 								),
-							static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY),
+							static_cast<int>(player.worldLeftTop.posY - kPlayerOffsetY + shakeOffsetY),
 							playerTexture,
 							1.0f, 1.0f, 0.0f, WHITE
 						);
@@ -2509,147 +2676,148 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						   //==========================================
 						   // クリア
 						   //==========================================
-		case Clear: {
-			clearTimer++;
-			if (clearTexture != -1) {
-				Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
-			}
-			else {
-				Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
-				Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
-			}
-			// クリア画面にも獲得コインを表示
-			if (coin != -1) {
-				Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
-			}
-			DrawCoinEffects();
-			DrawCoinCount();
+			case Clear: {
+				clearTimer++;
+				if (clearTexture != -1) {
+					Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
+				}
+				else {
+					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
+					Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+				}
+				// クリア画面にも獲得コインを表示
+				if (coin != -1) {
+					Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
+				}
+				DrawCoinEffects();
+				DrawCoinCount();
 
-			// 星が20フレームごとに1個ずつ飛び出す演出
-			const int kStarInterval = 20;
-			const int kStarSize = 180; // star.png / noStar.png の画像サイズ
-			const float kStarFinalScale = 0.9f;
-			for (int i = 0; i < 4; i++) {
-				int starElapsed = clearTimer - (i + 1) * kStarInterval;
-				if (starElapsed < 0) continue;
+				// 星が20フレームごとに1個ずつ飛び出す演出
+				const int kStarInterval = 20;
+				const int kStarSize = 180; // star.png / noStar.png の画像サイズ
+				const float kStarFinalScale = 0.9f;
+				for (int i = 0; i < 4; i++) {
+					int starElapsed = clearTimer - (i + 1) * kStarInterval;
+					if (starElapsed < 0) continue;
 
-				// ★追加: 条件を満たしている星（獲得できた星）の登場瞬間だけ効果音を鳴らす
-				if (starElapsed == 0 && starConditions[i]) {
-					if (starSound != -1) {
-						Novice::PlayAudio(starSound, false, 0.8f);
+					// ★追加: 条件を満たしている星（獲得できた星）の登場瞬間だけ効果音を鳴らす
+					if (starElapsed == 0 && starConditions[i]) {
+						if (starSound != -1) {
+							Novice::PlayAudio(starSound, false, 0.8f);
+						}
+					}
+
+					int texture = starConditions[i] ? starTexture : noStarTexture;
+					if (texture == -1) continue;
+
+					// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
+					float scale = kStarFinalScale;
+					if (starElapsed < 8) {
+						scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
+					}
+					else if (starElapsed < 16) {
+						scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
+					}
+
+					// 拡大・縮小しても星の中心位置が動かないようにする
+					int centerX = 325 + i * 210;
+					int centerY = 480;
+					int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
+					int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
+					Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
+
+					// 星の下に条件画像を表示
+					if (clearLabelTextures[i] != -1) {
+						Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
+							0.65f, 0.65f, 0.0f, WHITE);
 					}
 				}
-
-				int texture = starConditions[i] ? starTexture : noStarTexture;
-				if (texture == -1) continue;
-
-				// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
-				float scale = kStarFinalScale;
-				if (starElapsed < 8) {
-					scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
+				// 獲得星数を数字画像で表示
+				if (clearTimer >= 4 * kStarInterval + 16) {
+					// クリア画面の獲得星数：数字とスラッシュを小さくして画面内に収める
+					const float digitScale = 0.05f;
+					const float slashScale = 0.30f;
+					if (countTextures[starCount] != -1)
+						Novice::DrawSprite(595, 670, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
+					if (slashTexture != -1)
+						Novice::DrawSprite(615, 665, slashTexture, slashScale, slashScale, 0.0f, WHITE);
+					if (countTextures[4] != -1)
+						Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
 				}
-				else if (starElapsed < 16) {
-					scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
-				}
-
-				// 拡大・縮小しても星の中心位置が動かないようにする
-				int centerX = 325 + i * 210;
-				int centerY = 480;
-				int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
-				int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
-				Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
-
-				// 星の下に条件画像を表示
-				if (clearLabelTextures[i] != -1) {
-					Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
-						0.65f, 0.65f, 0.0f, WHITE);
-				}
-			}
-			// 獲得星数を数字画像で表示
-			if (clearTimer >= 4 * kStarInterval + 16) {
-				// クリア画面の獲得星数：数字とスラッシュを小さくして画面内に収める
-				const float digitScale = 0.05f;
-				const float slashScale = 0.30f;
-				if (countTextures[starCount] != -1)
-					Novice::DrawSprite(595, 670, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
-				if (slashTexture != -1)
-					Novice::DrawSprite(615, 665, slashTexture, slashScale, slashScale, 0.0f, WHITE);
-				if (countTextures[4] != -1)
-					Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
-			}
-			// 4つの星をすべて獲得したときだけPERFECTを表示
-			// 4つ目の星の登場アニメーションが終わってから表示
-			if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
-				int perfectElapsed = clearTimer - 110;
-				float perfectScale = 1.0f;
-				if (perfectElapsed < 10) {
-					perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
-					if (perfectElapsed == 0 && starSound != -1) {
-						Novice::PlayAudio(starSound, false, 1.0f);
+				// 4つの星をすべて獲得したときだけPERFECTを表示
+				// 4つ目の星の登場アニメーションが終わってから表示
+				if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
+					int perfectElapsed = clearTimer - 110;
+					float perfectScale = 1.0f;
+					if (perfectElapsed < 10) {
+						perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
+						if (perfectElapsed == 0 && starSound != -1) {
+							Novice::PlayAudio(starSound, false, 1.0f);
+						}
 					}
+					else if (perfectElapsed < 20) {
+						perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+					}
+					// perfect.png は400x200。上部中央に表示
+					const int perfectWidth = 400;
+					const int perfectHeight = 200;
+					int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
+					int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
+					Novice::DrawSprite(perfectX, perfectY, perfectTexture,
+						perfectScale, perfectScale, 0.0f, WHITE);
 				}
-				else if (perfectElapsed < 20) {
-					perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+				if (clearTimer >= kClearShowFrames) {
+					scene = Title;
+					timer = 0;
+					selectedMenu = 0;
+					isRuleOpen = false;
+					isTitleFading = false;
+					titleFadeTimer = 0;
+					title1Y = -180.0f;
+					title2Y = -250.0f;
+					title1Velocity = 0.0f;
+					title2Velocity = 0.0f;
+					penguinX = -200.0f;
+					penguinY = 380.0f;
+					player.worldLeftTop = { 10.0f, 500.0f };
+					playerVelocityY = 0.0f;
+					isJumping = false;
+					jumpCount = 0;
+					jumpFrame = 0;
+					jumpAnimationTimer = 0;
+					scrollValue = 0.0f;
+					gameFadeTimer = 0;
+					isGameClear = false;
+					goalTimer = 0;
+					goalFlagFrame = 0;
+					coinCount = 0;
+					hasVisitedBonus = false;
+					hasTakenDamage = false;
+					starCount = 0;
+
+					// タイトル戻り時にスピードアップ用のフラグをリセット
+					isSpeedBoostActive = false;
+					hasSpeedBoostTriggered = false;
+					speedBoostTimer = 0;
+					octopus.isActive = false;
+
+					memset(starConditions, 0, sizeof(starConditions));
+					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
+					memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
+					memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
+					isTransitioningToBonus = false;
+					isTransitioningFromBonus = false;
+					bonusTransitionTimer = 0;
+					bonusExitTransitionTimer = 0;
+					batteryFrame = 0;
+					batteryTimer = 0;
+					if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
+					if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
+					if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+					if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
 				}
-				// perfect.png は400x200。上部中央に表示
-				const int perfectWidth = 400;
-				const int perfectHeight = 200;
-				int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
-				int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
-				Novice::DrawSprite(perfectX, perfectY, perfectTexture,
-					perfectScale, perfectScale, 0.0f, WHITE);
+				break;
 			}
-			if (clearTimer >= kClearShowFrames) {
-				scene = Title;
-				timer = 0;
-				selectedMenu = 0;
-				isRuleOpen = false;
-				isTitleFading = false;
-				titleFadeTimer = 0;
-				title1Y = -180.0f;
-				title2Y = -250.0f;
-				title1Velocity = 0.0f;
-				title2Velocity = 0.0f;
-				penguinX = -200.0f;
-				penguinY = 380.0f;
-				player.worldLeftTop = { 10.0f, 500.0f };
-				playerVelocityY = 0.0f;
-				isJumping = false;
-				jumpCount = 0;
-				jumpFrame = 0;
-				jumpAnimationTimer = 0;
-				scrollValue = 0.0f;
-				gameFadeTimer = 0;
-				isGameClear = false;
-				goalTimer = 0;
-				goalFlagFrame = 0;
-				coinCount = 0;
-				hasVisitedBonus = false;
-				hasTakenDamage = false;
-				starCount = 0;
-
-				// タイトル戻り時にスピードアップ用のフラグをリセット
-				isSpeedBoostActive = false;
-				hasSpeedBoostTriggered = false;
-				speedBoostTimer = 0;
-
-				memset(starConditions, 0, sizeof(starConditions));
-				memcpy(coinMap, initialCoinMap, sizeof(coinMap));
-				memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
-				memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
-				isTransitioningToBonus = false;
-				isTransitioningFromBonus = false;
-				bonusTransitionTimer = 0;
-				bonusExitTransitionTimer = 0;
-				batteryFrame = 0;
-				batteryTimer = 0;
-				if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
-				if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
-				if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
-				if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
-			}
-			break;
-		}
 
 
 					  //==========================================
@@ -2756,7 +2924,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						// 画像の右端が完全に画面の左外側（scrollValue）を出たら再出現
 						if (enemy.position.posX + enemy.size.posX < scrollValue) {
 							enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-							enemy.position.posY = 420.0f;
+							enemy.position.posY = 480.0f; // シャチのY位置をさらに下に調整
 							enemy.hasTrampoline = true;
 						}
 					}
@@ -3361,7 +3529,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			Novice::DrawBox(
 				0, 0, 1280, 720,
 				0.0f,
-				static_cast<unsigned int>(alpha),
+				(0x00000000 | static_cast<unsigned int>(alpha)),
 				kFillModeSolid
 			);
 
