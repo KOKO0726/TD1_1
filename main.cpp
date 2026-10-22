@@ -230,6 +230,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int tutorialTextTexture4 =
 		Novice::LoadTexture("./Resources/images/tutorialText4.png");
 
+	int secretHandle[3] = {};
+	secretHandle[0] = Novice::LoadTexture("./Resources/images/wireFish1.png");
+	secretHandle[1] = Novice::LoadTexture("./Resources/images/wireFish2.png");
+	secretHandle[2] = Novice::LoadTexture("./Resources/images/wireFish3.png");
+	bool isTimerSecret = false;
+	float secretX = 0.0f;
+	int secretAnimationTimer = 0;
+	int secretCurrentFrame = 0;
 	//==========================================
 	// 敵（シャチ）の設定
 	//==========================================
@@ -527,6 +535,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					380.0f + sinf(timer * 0.07f) * 5.0f;
 			}
 
+			// --- シークレット画像の出現・移動処理を追加 ---
+			if (timer > 1800) 
+			{ 
+				isTimerSecret = true;
+				secretX += 7.0f; 
+			}
+
+			// 画面右端に消えたらリセットする場合（任意）
+			if (secretX > 1280.0f) {
+				isTimerSecret = false;
+			}
+
 			//==========================================
 			// メニュー操作
 			//==========================================
@@ -760,6 +780,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						selectArrowTexture,
 						1.0f, 1.0f, 0.0f, WHITE
 					);
+				}
+
+			}
+			
+			//シークレット
+			if (isTimerSecret && secretHandle[secretCurrentFrame] != -1)
+			{
+				Novice::DrawSprite(
+					static_cast<int>(secretX),
+					300, // Y座標（画面の中央付近）
+					secretHandle[secretCurrentFrame],
+					1.0f,
+					1.0f,
+					0.0f,
+					WHITE
+				);
+			}
+			// アニメーション更新
+			if (isTimerSecret) {
+				secretAnimationTimer++;
+				if (secretAnimationTimer >= 10) {
+					secretAnimationTimer = 0;
+					secretCurrentFrame++;
+					if (secretCurrentFrame >= 3) {
+						secretCurrentFrame = 0;
+					}
 				}
 			}
 
@@ -3117,6 +3163,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			);
 
 			gameFadeTimer++;
+			//シークレット
+			isTimerSecret = false;
+			secretX = -100.0f; 
 		}
 
 		Novice::EndFrame();
