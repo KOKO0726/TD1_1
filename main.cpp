@@ -359,6 +359,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int gameOverSound =
 		Novice::LoadAudio("./Resources/sound/gameOver.MP3");
 
+	int hitSound =
+		Novice::LoadAudio("./Resources/sound/hitsound.MP3");
+
+	int goalHitSound =
+		Novice::LoadAudio("./Resources/sound/goalhit.MP3");
+
+	int resultSound =
+		Novice::LoadAudio("./Resources/sound/result.MP3");
+
 	//==========================================
 	// BGM
 	//==========================================
@@ -597,6 +606,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 			++effect.timer;
 			if (effect.timer >= 32) effect.active = false; // 4フレーム×2コマ×4周
+		}
+		};
+
+	// プレイヤーの滑走パーティクル（派手な雪煙・氷の粒子）の発生処理
+	auto SpawnSlideParticle = [&](float playerX, float playerY, float moveSpeed) {
+		// 発生する粒子の個数（一度に2〜4個の粒子を生成してボリューム感をアップ）
+		int spawnCount = 2 + rand() % 3;
+
+		for (int count = 0; count < spawnCount; ++count) {
+			for (int i = 0; i < kMaxParticles; ++i) {
+				if (!particles[i].isActive) {
+					// プレイヤーの足元付近（少し幅を持たせて散らす）
+					particles[i].position.posX = playerX + (rand() % 60 - 20);
+					particles[i].position.posY = playerY + 65.0f + (rand() % 15);
+
+					// 進行方向の逆（左後ろ）〜真上近くまで勢いよく飛ぶベクトル
+					float speedX = -(moveSpeed * (0.3f + (rand() % 50) / 50.0f)) - (rand() % 6);
+					float speedY = -(static_cast<float>(rand() % 60) / 10.0f) - 1.0f; // 上方向へ勢いよく跳ね上げる
+
+					particles[i].velocity = { speedX, speedY };
+					particles[i].timer = 0;
+					particles[i].lifeTime = 20 + rand() % 15; // 20〜35フレーム（少し長めに残る）
+					particles[i].radius = 2.0f + (rand() % 7); // サイズも2px〜8pxとメリハリをつける
+
+					// カラーバリエーション（白・水色・輝く黄色系を混ぜて華やかさをプラス）
+					int colorType = rand() % 4;
+					if (colorType == 0)      particles[i].color = 0xFFFFFFFF; // 白
+					else if (colorType == 1) particles[i].color = 0x80E0FFFF; // 鮮やかな水色
+					else if (colorType == 2) particles[i].color = 0xC0F0FFFF; // 薄い水色
+					else                     particles[i].color = 0xFFFFCCFF; // キラッと光る薄黄色
+
+					particles[i].isActive = true;
+					break;
+				}
+			}
 		}
 		};
 
@@ -1364,8 +1408,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				if (!isTransitioningToBonus && !isGameClear) {
 					player.worldLeftTop.posX += kMoveSpeed;
 
+					// ★ 地上にいる（ジャンプしていない）時に滑走パーティクルを発生 ★
+					if (!isJumping) {
+						SpawnSlideParticle(player.worldLeftTop.posX, player.worldLeftTop.posY, kMoveSpeed);
+					}
+
 					if (keys[DIK_A]) {
-						player.worldLeftTop.posX -= 30.0f;//デバック用
+						player.worldLeftTop.posX -= 30.0f; // デバッグ用
 					}
 
 					if (!waitSpaceRelease && preKeys[DIK_SPACE] == 0 &&
@@ -1441,12 +1490,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							playerTop < enemyBottom &&
 							playerBottom > enemyTop) {
 
+							// ヒット音の再生
+							if (hitSound != -1) {
+								Novice::PlayAudio(hitSound, false, 0.8f);
+							}
+
+							// ★追加：血のような赤いパーティクルの発生処理
+							float playerCenterX = player.worldLeftTop.posX + player.size.posX * 0.5f;
+							float playerCenterY = player.worldLeftTop.posY + player.size.posY * 0.5f;
+							int spawnedCount = 0;
+
+							for (int p = 0; p < kMaxParticles; p++) {
+								if (!particles[p].isActive) {
+									// ランダムな方向に散らす
+									float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+									float speed = 4.0f + static_cast<float>(rand()) / RAND_MAX * 8.0f;
+
+									particles[p].position = { playerCenterX, playerCenterY };
+									particles[p].velocity = { cosf(angle) * speed, sinf(angle) * speed };
+									particles[p].timer = 0;
+									particles[p].lifeTime = 20 + rand() % 15; // 寿命をランダム化
+									particles[p].radius = 4.0f + static_cast<float>(rand()) / RAND_MAX * 5.0f;
+
+									// 濃い赤〜明るい赤のランダムな血の色 (RGBA)
+									if (rand() % 2 == 0) {
+										particles[p].color = 0xCC0000FF; // ダークレッド
+									}
+									else {
+										particles[p].color = 0xFF2222FF; // 明るい赤
+									}
+
+									particles[p].isActive = true;
+
+									spawnedCount++;
+									if (spawnedCount >= 16) break; // 1回の被弾で16個発生
+								}
+							}
+
 							// ライフを1つ減らす
 							if (playerLife > 0) {
 								playerLife--;
 							}
 
-							// ★追加：ライフが0になったらゲームオーバーシーンへ移動
+							// ライフが0になったらゲームオーバーシーンへ移動
 							if (playerLife <= 0) {
 								scene = GameOver;
 								gameOverTimer = 0;
@@ -1457,7 +1543,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 									stagePlayHandle = -1;
 								}
 
-								// ★ゲームオーバー音を再生
+								// ゲームオーバー音を再生
 								if (gameOverSound != -1) {
 									Novice::PlayAudio(gameOverSound, false, 0.8f);
 								}
@@ -1752,7 +1838,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					player.worldLeftTop.posX + player.size.posX > kGoalX &&
 					player.worldLeftTop.posX < kGoalX + 200.0f &&
 					player.worldLeftTop.posY + player.size.posY > kGoalY) {
+
 					isGameClear = true;
+
+					// ★ ここにゴール効果音の再生処理を追加 ★
+					if (goalHitSound != -1) {
+						Novice::PlayAudio(goalHitSound, false, 1.0f); // 音量は好みに合わせて調整してください
+					}
+
 					// ゴール時に4つの星の条件を確定
 					starConditions[0] = true;
 					starConditions[1] = hasVisitedBonus;
@@ -1922,7 +2015,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// 黄色いコイン用パーティクル描画
+				// パーティクル描画
 				for (int i = 0; i < kMaxParticles; i++)
 				{
 					if (particles[i].isActive)
@@ -1932,25 +2025,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						float screenY =
 							particles[i].position.posY + shakeOffsetY;
 
-						// 外側
+						// 外側（少し濃い同系統の色）
 						Novice::DrawEllipse(
 							(int)screenX,
 							(int)screenY,
-							(int)(particles[i].radius * 2.0f),
-							(int)(particles[i].radius * 2.0f),
+							(int)(particles[i].radius * 1.5f),
+							(int)(particles[i].radius * 1.5f),
 							0,
-							0xFFAA00FF,
+							particles[i].color,
 							kFillModeSolid
 						);
 
-						// 内側
+						// 内側（明るいコア）
 						Novice::DrawEllipse(
 							(int)screenX,
 							(int)screenY,
 							(int)particles[i].radius,
 							(int)particles[i].radius,
 							0,
-							particles[i].color,
+							WHITE, // 中心を白く光らせることで鮮やかになります
 							kFillModeSolid
 						);
 					}
@@ -2820,16 +2913,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						   //==========================================
 			case Clear: {
 				clearTimer++;
+
+				// ★ リザルト音の再生（クリア画面に入った最初の1フレーム目のみ） ★
+				if (clearTimer == 1) {
+					if (resultSound != -1) {
+						Novice::PlayAudio(resultSound, false, 0.3f);
+					}
+				}
+
 				if (clearTexture != -1) {
 					Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 				else {
 					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
 					Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
-				}
-				// クリア画面にも獲得コインを表示
-				if (coin != -1) {
-					Novice::DrawSprite(1080, 15, coin, 0.5f, 0.5f, 0.0f, WHITE);
 				}
 				DrawCoinEffects();
 				DrawCoinCount();
