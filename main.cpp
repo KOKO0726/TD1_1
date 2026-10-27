@@ -77,7 +77,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// // ライフと無敵時間（エネミー当たり判定用）
 	//========================================
 	int playerLife = 3;
-	int maxPlayerLife = 3; // ★追加：最大ライフを保持する変数
+	int maxPlayerLife = 3;
 	bool isInvincible = false;
 	int invincibleTimer = 0;
 	const int kInvincibleDuration = 120; // ダメージ後約2秒間の無敵時間
@@ -107,6 +107,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	bool isSpeedBoostActive = false;
 	bool hasSpeedBoostTriggered = false;
 	int speedBoostTimer = 0;
+	//マイナスバッテリー対策の無敵
+	int bonusInvincibleTimer = 0;
+	const int kBonusInvincibleDuration = 90; // 宇宙開始後約1.5秒間無敵
 
 	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
@@ -404,6 +407,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int titlePlayHandle = -1;
 	int stagePlayHandle = -1;
 	int bonusPlayHandle = -1;
+	int tutorialPlayHandle = -1;
 
 	if (kTitleHandle != -1) {
 		titlePlayHandle =
@@ -420,7 +424,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	Vector2 trampolinePositions[] = {
 		{ 3000.0f, 500.0f },
-		{ 5000.0f, 500.0f }
+		{ 15000.0f, 500.0f }
 	};
 
 	const int kTrampolineCount =
@@ -820,6 +824,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
 						if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
 						if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+						if (tutorialPlayHandle != -1) {
+							Novice::StopAudio(tutorialPlayHandle);
+							tutorialPlayHandle = -1;
+						}
 						if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
 					}
 				}
@@ -1027,7 +1035,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							preKeys[DIK_SPACE] = 1;
 
 							if (kTutorialHandle != -1) {
-								Novice::PlayAudio(
+								tutorialPlayHandle = Novice::PlayAudio(
 									kTutorialHandle, true, 0.5f
 								);
 							}
@@ -1464,6 +1472,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 					// ゲームシーンへ移動
 					scene = Game;
+
+					// ★追加: ゲーム開始時に約2秒間（120フレーム）の無敵時間を付与
+					isInvincible = true;
+					invincibleTimer = 0;
 
 					// ステージBGMを1回だけ再生
 					if (kStageHandle != -1) {
@@ -2298,6 +2310,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						hasVisitedBonus = true;
 						isTransitioningToBonus = false;
 						bonusTransitionTimer = 0;
+						bonusInvincibleTimer = 0;
 
 						batteryFrame = 0;
 						batteryTimer = 0;
@@ -2305,7 +2318,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						isTransitioningFromBonus = false;
 						bonusExitTransitionTimer = 0;
 
-						player.worldLeftTop.posY = 200.0f;
+						// ★ 修正1：宇宙ステージの開始X座標を 0.0f にセット（常にスタート位置から開始）
+						player.worldLeftTop.posX = 0.0f;
+
+						// ★ 修正2：出現高さ(Y座標)をアイテム直撃を防ぐ位置に指定
+						player.worldLeftTop.posY = 100.0f;
 						playerVelocityY = 0.0f;
 
 						// 充電・ダメージアイテムの初期化（幅20マス分）
@@ -2316,7 +2333,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						}
 						// 1ループ（20マス＝2560px）内での配置設定
 						bonusMap[3][10] = 1; // 充電電池 (回復)
-						bonusMap[2][5] = 2; // ダメージ電池 1
+						bonusMap[2][8] = 2; // ダメージ電池 1（避ける猶予を作るため位置変更）
 						bonusMap[4][15] = 2; // ダメージ電池 2
 
 						// ボーナスステージのコイン・アイテム獲得フラグをリセット
@@ -2332,9 +2349,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							}
 						}
 
-						//==================================
-						// ★宇宙に入ったらfireを常時再生
-						//==================================
+						// ==================================
+						// ★ 宇宙に入ったらBGM・SE切り替え
+						// ==================================
 						if (firePlayHandle != -1) {
 							Novice::StopAudio(firePlayHandle);
 							firePlayHandle = -1;
@@ -2348,14 +2365,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 						// ボーナスステージのBGMを再生
 						if (kBonusHandle != -1) {
-							bonusPlayHandle =
-								Novice::PlayAudio(kBonusHandle, true, 0.5f);
+							bonusPlayHandle = Novice::PlayAudio(kBonusHandle, true, 0.5f);
 						}
 
 						// ロケットの噴射音を再生
 						if (fireSound != -1) {
-							firePlayHandle =
-								Novice::PlayAudio(fireSound, true, 1.0f);
+							firePlayHandle = Novice::PlayAudio(fireSound, true, 1.0f);
 						}
 					}
 				}
@@ -2598,6 +2613,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				// 背景ループ幅 (2560px)
 				const float kLoopWidth = 2560.0f;
 
+				// 宇宙開始直後の無敵タイマー更新
+				if (bonusInvincibleTimer < kBonusInvincibleDuration) {
+					bonusInvincibleTimer++;
+				}
 				//==========================================
 				// 充電・ダメージアイテムとの当たり判定（拾うと消滅）
 				//==========================================
@@ -2607,7 +2626,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						if (bonusMap[y][x] == 0) {
 							continue;
 						}
-
+						//宇宙開始直後でダメージ電池(2)の場合は判定をスルー
+						if (bonusInvincibleTimer < kBonusInvincibleDuration && bonusMap[y][x] == 2) {
+							continue;
+						}
 						float baseItemX = static_cast<float>(x * kBonusTileSize) + 24.0f;
 						float itemY = static_cast<float>(y * kBonusTileSize) + 24.0f;
 
@@ -2981,6 +3003,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						}
 
 						scene = Game;
+
+						// ★追加: 宇宙から復帰した直後に約2秒間の無敵時間を付与
+						isInvincible = true;
+						invincibleTimer = 0;
+
 						isTransitioningFromBonus = false;
 						gameFadeTimer = 0;
 
@@ -3232,8 +3259,90 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					Novice::ScreenPrintf(560, 360, "GAME OVER");
 				}
 
-				// クリア画面と同じ時間（kClearShowFrames = 420フレーム / 約7秒）が経過したらタイトルへ戻る
-				if (gameOverTimer >= kClearShowFrames) {
+				// ==========================================
+				// ★ Rキーでリスタート（現在のステージを再挑戦）
+				// ==========================================
+				if (preKeys[DIK_R] == 0 && keys[DIK_R] != 0) {
+					// ステージ選択時の設定に合わせてパラメータを再セット
+					if (selectedStage == 0) { // STAGE 1
+						kMoveSpeed = 10.0f;
+						playerLife = 3;
+						maxPlayerLife = 3;
+						enemy.speed = 8.0f;
+						enemy.isActive = true;
+						octopus.isActive = false;
+					}
+					else if (selectedStage == 1) { // STAGE 2
+						kMoveSpeed = 14.0f;
+						playerLife = 3;
+						maxPlayerLife = 3;
+						enemy.speed = 10.0f;
+						enemy.isActive = true;
+						octopus.isActive = false;
+					}
+					else if (selectedStage == 2) { // STAGE 3
+						kMoveSpeed = 12.0f;
+						playerLife = 1;
+						maxPlayerLife = 1;
+						enemy.speed = 12.0f;
+						enemy.isActive = false;
+						octopus.isActive = true;
+						octopus.position = { 1280.0f + 300.0f, 250.0f };
+						octopus.shakeTimer = 30;
+					}
+
+					// プレイヤー・ゲーム変数のリセット
+					player.worldLeftTop = { 10.0f, 500.0f };
+					playerVelocityY = 0.0f;
+					isJumping = false;
+					jumpCount = 0;
+					jumpFrame = 0;
+					jumpAnimationTimer = 0;
+					scrollValue = 0.0f;
+					gameFadeTimer = 0;
+					isGameClear = false;
+					goalTimer = 0;
+					goalFlagFrame = 0;
+					coinCount = 0;
+					hasVisitedBonus = false;
+					hasTakenDamage = false;
+					starCount = 0;
+					isInvincible = false;
+					invincibleTimer = 0;
+
+					// 敵・ボーナス関連のリセット
+					enemy.position = { 1280.0f + 200.0f, 480.0f };
+					enemy.hasTrampoline = (rand() % 2 == 0);
+					isSpeedBoostActive = false;
+					hasSpeedBoostTriggered = false;
+					speedBoostTimer = 0;
+
+					memset(starConditions, 0, sizeof(starConditions));
+					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
+					memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
+					memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
+					isTransitioningToBonus = false;
+					isTransitioningFromBonus = false;
+					bonusTransitionTimer = 0;
+					bonusExitTransitionTimer = 0;
+					batteryFrame = 0;
+					batteryTimer = 0;
+
+					// BGM停止・再開
+					if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
+					if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
+					if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+
+					// カウントダウン画面からリスタート
+					scene = CountDown;
+					isCountingDown = true;
+					countDownTimer = 0;
+				}
+
+				// ==========================================
+				// ★ Tキーでタイトルに戻る
+				// ==========================================
+				if (preKeys[DIK_T] == 0 && keys[DIK_T] != 0) {
 					scene = Title;
 					timer = 0;
 					selectedMenu = 0;
