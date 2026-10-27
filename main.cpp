@@ -122,11 +122,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// チュートリアル用ガイド変数
 	//==========================================
 	bool isTutorialPaused = false;
-	bool isStartGuideDone = false;       // 開始時の空中ジャンプガイド完了フラグ
-	bool isTrampolineGuideDone = false;  // トランポリン手前ガイド完了フラグ
-	int tutorialPauseType = 0;           // 0: 開始時空中ポーズ, 1: トランポリン前ポーズ
-	int tutorialStep = 1;                // 開始時ポーズの段数(1~3)
-	bool isWaitingForPeak = false;       // ジャンプ頂点到達待ちフラグ
+	bool isStartGuideDone = false;       
+	bool isTrampolineGuideDone = false;  
+	int tutorialPauseType = 0;           
+	int tutorialStep = 1;                
+	bool isWaitingForPeak = false;       
 
 	//==========================================
 	// ジャンプ
@@ -442,7 +442,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	// コインパーティクル
 	//==========================================
-	const int kMaxParticles = 40;
+	const int kMaxParticles = 120;
 	Particle particles[kMaxParticles]{};
 
 	const int kParticleLifeTime = 40;
