@@ -15,7 +15,8 @@ enum GameShene
 	Game,
 	tutorial,
 	BonusStage,
-	Clear
+	Clear,
+	GameOver,
 };
 
 struct Vector2
@@ -183,6 +184,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 背景
 	int backgroundTexture =
 		Novice::LoadTexture("./Resources/images/iceBackGround.png");
+	// バットエンド背景
+	int gameOverTexture =
+		Novice::LoadTexture("./Resources/images/gameOver.png");
 	// 宇宙ステージ1
 	int universeTexture =
 		Novice::LoadTexture("./Resources/images/universe.png");
@@ -352,6 +356,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int countDownStartSound =
 		Novice::LoadAudio("./Resources/sound/CountdownStart.MP3");
 
+	int gameOverSound =
+		Novice::LoadAudio("./Resources/sound/gameOver.MP3");
+
 	//==========================================
 	// BGM
 	//==========================================
@@ -412,7 +419,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kCoinMapWidth = 100;
 	const int kCoinMapSize = 64;
 	const float kCoinSize = 48.0f;
-
+	int coinCount = 0;
 	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
 	int coinMap[kCoinMapHeight][kCoinMapWidth] =
 	{
@@ -487,7 +494,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int clearTimer = 0;
 	const int kGoalWaitFrames = 180;
 	const int kClearShowFrames = 420;
-	int coinCount = 0;
+	//ゲームオーバー
+	int gameOverTimer = 0;
+
 	//星の管理変数
 	bool hasVisitedBonus = false;
 	bool hasTakenDamage = false;
@@ -1435,6 +1444,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							// ライフを1つ減らす
 							if (playerLife > 0) {
 								playerLife--;
+							}
+
+							// ★追加：ライフが0になったらゲームオーバーシーンへ移動
+							if (playerLife <= 0) {
+								scene = GameOver;
+								gameOverTimer = 0;
+
+								// BGM停止処理
+								if (stagePlayHandle != -1) {
+									Novice::StopAudio(stagePlayHandle);
+									stagePlayHandle = -1;
+								}
+
+								// ★ゲームオーバー音を再生
+								if (gameOverSound != -1) {
+									Novice::PlayAudio(gameOverSound, false, 0.8f);
+								}
 							}
 
 							hasTakenDamage = true; // 星の獲得条件用フラグ
@@ -2935,10 +2961,88 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				break;
 			}
 
+					  //==========================================
+					  // ゲームオーバー
+					  //==========================================
+			case GameOver: {
+				gameOverTimer++;
 
-					  //==========================================
-					  // チュートリアル
-					  //==========================================
+				// ★1フレーム目にゲームオーバーサウンドを再生（未再生時）
+				if (gameOverTimer == 1) {
+					if (gameOverSound != -1) {
+						Novice::PlayAudio(gameOverSound, false, 0.8f);
+					}
+				}
+
+				// 背景描画（gameOverTexture が読み込まれていれば表示）
+				if (gameOverTexture != -1) {
+					Novice::DrawSprite(0, 0, gameOverTexture, 1.0f, 1.0f, 0.0f, WHITE);
+				}
+				else {
+					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
+					Novice::ScreenPrintf(560, 360, "GAME OVER");
+				}
+
+				// クリア画面と同じ時間（kClearShowFrames = 420フレーム / 約7秒）が経過したらタイトルへ戻る
+				if (gameOverTimer >= kClearShowFrames) {
+					scene = Title;
+					timer = 0;
+					selectedMenu = 0;
+					isRuleOpen = false;
+					isTitleFading = false;
+					titleFadeTimer = 0;
+					title1Y = -180.0f;
+					title2Y = -250.0f;
+					title1Velocity = 0.0f;
+					title2Velocity = 0.0f;
+					penguinX = -200.0f;
+					penguinY = 380.0f;
+					player.worldLeftTop = { 10.0f, 500.0f };
+					playerVelocityY = 0.0f;
+					isJumping = false;
+					jumpCount = 0;
+					jumpFrame = 0;
+					jumpAnimationTimer = 0;
+					scrollValue = 0.0f;
+					gameFadeTimer = 0;
+					isGameClear = false;
+					goalTimer = 0;
+					goalFlagFrame = 0;
+					coinCount = 0;
+					hasVisitedBonus = false;
+					hasTakenDamage = false;
+					starCount = 0;
+					playerLife = 3;
+					isInvincible = false;
+					invincibleTimer = 0;
+
+					isSpeedBoostActive = false;
+					hasSpeedBoostTriggered = false;
+					speedBoostTimer = 0;
+					octopus.isActive = false;
+
+					memset(starConditions, 0, sizeof(starConditions));
+					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
+					memset(coinCollectedByStage, 0, sizeof(coinCollectedByStage));
+					memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
+					isTransitioningToBonus = false;
+					isTransitioningFromBonus = false;
+					bonusTransitionTimer = 0;
+					bonusExitTransitionTimer = 0;
+					batteryFrame = 0;
+					batteryTimer = 0;
+
+					if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
+					if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
+					if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+					if (kTitleHandle != -1) titlePlayHandle = Novice::PlayAudio(kTitleHandle, true, 0.5f);
+				}
+				break;
+			}
+
+						 //==========================================
+						 // チュートリアル
+						 //==========================================
 
 			case tutorial: {
 				// チュートリアル用の弱めのトランポリン跳ね返り力
