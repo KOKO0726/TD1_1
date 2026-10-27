@@ -10,7 +10,8 @@ const char kWindowTitle[] = "LC1D_12_タカハシ";
 enum GameShene
 {
 	Title,
-	SelectStage, // ステージ選択画面を追加
+	SelectStage,
+	CountDown,// カウントダウン画面
 	Game,
 	tutorial,
 	BonusStage,
@@ -71,8 +72,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const float kBackgroundWidth = 1280.0f * 4.0f;
 
 	float savedPlayerX = 0.0f;
-
+	//========================================
 	// ライフと無敵時間（エネミー当たり判定用）
+	//========================================
 	int playerLife = 3;
 	bool isInvincible = false;
 	int invincibleTimer = 0;
@@ -106,7 +108,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	// ボーナスステージ用 マップチップ設定 (充電・ダメージアイテム用)
 	const int kBonusMapHeight = 10;
-	const int kBonusMapWidth = 100;
+	const int kBonusMapWidth = 20; // ★1ループ分（2560px）の20マスに変更
 	const int kBonusTileSize = 128; // マップチップ間隔
 	const float kBonusItemHitSize = 80.0f;
 	int bonusMap[kBonusMapHeight][kBonusMapWidth] = {};
@@ -139,7 +141,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int jumpFrame = 0;
 	int jumpAnimationTimer = 0;
 	const int kJumpFrameCount = 4;
-
+	//======================================
+	// カウントダウン用変数
+	//======================================
+	bool isCountingDown = false;
+	int countDownTimer = 0;
+	// 3、2、1、START の表示時間
+	const int kCountDownTotalTime = 240;
 	//==========================================
 	// 画像
 	//==========================================
@@ -232,13 +240,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		Novice::LoadTexture("./Resources/images/formatCoin.png"),
 		Novice::LoadTexture("./Resources/images/noDamage.png")
 	};
+	//===============================
+	//数値用のリソース
+	//===============================
 	int countTextures[10] = {};
 	for (int i = 0; i < 10; i++) {
 		char path[128];
 		sprintf_s(path, sizeof(path), "./Resources/images/count/count%d.png", i);
 		countTextures[i] = Novice::LoadTexture(path);
 	}
-	int slashTexture = Novice::LoadTexture("./Resources/images/slash.png");
+	//スタート文字
+	int startTextTexture =
+		Novice::LoadTexture("./Resources/images/start.png");
+	//スラッシュ	
+	int slashTexture =
+		Novice::LoadTexture("./Resources/images/slash.png");
+
 	//ライフの画像
 	int playerLifeTexture =
 		Novice::LoadTexture("./Resources/images/life.png");
@@ -328,6 +345,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	int starSound =
 		Novice::LoadAudio("./Resources/sound/star.MP3");
+
+	int countDownSound =
+		Novice::LoadAudio("./Resources/sound/Countdown.MP3");
+
+	int countDownStartSound =
+		Novice::LoadAudio("./Resources/sound/CountdownStart.MP3");
 
 	//==========================================
 	// BGM
@@ -1147,7 +1170,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						octopus.shakeTimer = 30; // 登場時に約0.5秒画面揺らし
 					}
 
-					scene = Game;
+					scene = CountDown;
+
+					// カウントダウン開始
+					isCountingDown = true;
+					countDownTimer = 0;
 
 					// ライフと無敵時間を初期化
 					isInvincible = false;
@@ -1161,10 +1188,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 					enemy.hasTrampoline = (rand() % 2 == 0);
 
-					// ステージBGMを再生
-					if (kStageHandle != -1) {
-						stagePlayHandle = Novice::PlayAudio(kStageHandle, true, 1.0f);
-					}
 				}
 
 				// 描画
@@ -1203,10 +1226,108 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				break;
 			}
+							//==========================================
+							// カウントダウン
+							//==========================================
+			case CountDown: {
 
-							//==========================================
-							// 通常ゲーム
-							//==========================================
+				countDownTimer++;
+
+				// --- 効果音の再生処理 ---
+				// 3, 2, 1 のタイミング（1, 60, 120フレーム目）は通常のカウント音
+				if (countDownTimer == 1 || countDownTimer == 60 || countDownTimer == 120) {
+					if (countDownSound != -1) {
+						Novice::PlayAudio(countDownSound, false, 0.8f);
+					}
+				}
+				// START! の表示タイミング（180フレーム目）でスタート専用の音を鳴らす
+				else if (countDownTimer == 180) {
+					if (countDownStartSound != -1) {
+						Novice::PlayAudio(countDownStartSound, false, 0.8f);
+					}
+				}
+
+				// 背景
+				if (backgroundTexture != -1) {
+					Novice::DrawSprite(
+						0, 0,
+						backgroundTexture,
+						1.0f, 1.0f,
+						0.0f, WHITE
+					);
+				}
+
+				// プレイヤーを開始位置に表示
+				if (playerTexture != -1) {
+					Novice::DrawSprite(
+						10, 452,
+						playerTexture,
+						1.0f, 1.0f,
+						0.0f, WHITE
+					);
+				}
+
+				// 3 → 2 → 1 → START
+				if (countDownTimer < 60) {
+					Novice::DrawSprite(
+						576, 250,
+						countTextures[3],
+						0.5f, 0.5f,
+						0.0f, WHITE
+					);
+				}
+				else if (countDownTimer < 120) {
+					Novice::DrawSprite(
+						576, 250,
+						countTextures[2],
+						0.5f, 0.5f,
+						0.0f, WHITE
+					);
+				}
+				else if (countDownTimer < 180) {
+					Novice::DrawSprite(
+						576, 250,
+						countTextures[1],
+						0.5f, 0.5f,
+						0.0f, WHITE
+					);
+				}
+				else {
+					Novice::DrawSprite(
+						576, 250,
+						startTextTexture,
+						0.5f, 0.5f,
+						0.0f, WHITE
+					);
+				}
+
+				// 約4秒後にゲーム開始
+				if (countDownTimer >= kCountDownTotalTime) {
+
+					isCountingDown = false;
+					countDownTimer = 0;
+
+					// 念のため、すでに再生中なら停止
+					if (stagePlayHandle != -1) {
+						Novice::StopAudio(stagePlayHandle);
+						stagePlayHandle = -1;
+					}
+
+					// ゲームシーンへ移動
+					scene = Game;
+
+					// ステージBGMを1回だけ再生
+					if (kStageHandle != -1) {
+						stagePlayHandle =
+							Novice::PlayAudio(kStageHandle, true, 1.0f);
+					}
+				}
+
+				break;
+			}
+						  //==========================================
+						  // 通常ゲーム
+						  //==========================================
 
 			case Game: {
 				//==========================================
@@ -1968,18 +2089,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						player.worldLeftTop.posY = 200.0f;
 						playerVelocityY = 0.0f;
 
-						// 充電・ダメージアイテムの初期化
+						// 充電・ダメージアイテムの初期化（幅20マス分）
 						for (int y = 0; y < kBonusMapHeight; y++) {
 							for (int x = 0; x < kBonusMapWidth; x++) {
 								bonusMap[y][x] = 0;
-								// ボーナスステージのコイン取得状態をリセット
-								memset(bonusCoinCollected, 0, sizeof(bonusCoinCollected));
 							}
 						}
-						// 1つのループパターン（40マス＝2560px）内での配置
-						bonusMap[3][20] = 1; // 充電電池 (回復) : 1個
-						bonusMap[2][10] = 2; // ダメージ電池 (ダメージ) : 1個目
-						bonusMap[4][30] = 2; // ダメージ電池 (ダメージ) : 2個目
+						// 1ループ（20マス＝2560px）内での配置設定
+						bonusMap[3][10] = 1; // 充電電池 (回復)
+						bonusMap[2][5] = 2; // ダメージ電池 1
+						bonusMap[4][15] = 2; // ダメージ電池 2
+
+						// ボーナスステージのコイン・アイテム獲得フラグをリセット
+						memset(bonusCoinCollected, 0, sizeof(bonusCoinCollected));
+						memset(bonusItemCollected, 0, sizeof(bonusItemCollected));
 
 						// 獲得フラグのリセット
 						for (int i = 0; i < kMaxBonusLoops; i++) {
@@ -2107,8 +2230,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					for (int y = 0; y < kBonusCoinMapHeight; y++) {
 						for (int x = 0; x < kBonusCoinLoopTileCount; x++) {
 
+							// マップ配列(幅100)からループで参照
+							int mapX = x % kBonusCoinMapWidth;
+
 							// コインがなければスキップ
-							if (bonusCoinMap[y][x] != 1) {
+							if (bonusCoinMap[y][mapX] != 1) {
 								continue;
 							}
 
@@ -2117,7 +2243,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								continue;
 							}
 
-							// ★コイン(64x64)の判定を中心寄り(48x48)に配置
+							// コイン(64x64)の判定を中心寄り(48x48)に配置
 							float coinX =
 								x * kBonusCoinMapSize
 								+ loop * kBonusCoinLoopWidth + 8.0f;
@@ -2135,7 +2261,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 							float hitSize = kBonusCoinHitSize;
 
-							// コイン矩形との当たり判定
 							float hitLeft = coinX;
 							float hitTop = coinY;
 
@@ -2144,12 +2269,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								playerTop < hitTop + hitSize &&
 								playerBottom > hitTop) {
 
-								// このループのコインだけ取得済みにする
+								// このループのコインを取得済みにする
 								bonusCoinCollected[loop][y][x] = true;
 
 								coinCount++;
 								StartCoinEffect(coinX, coinY);
-								// コインを取った場所から黄色い粒を発生
+
 								for (int i = 0; i < kMaxParticles; i++)
 								{
 									if (!particles[i].isActive)
@@ -2173,22 +2298,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 										particles[i].timer = 0;
 										particles[i].lifeTime = kParticleLifeTime;
 										particles[i].radius = 5.0f;
-										particles[i].color = 0xFFFF00FF; // コイン用は黄色に戻す
+										particles[i].color = 0xFFFF00FF;
 										particles[i].isActive = true;
 
 										break;
 									}
 								}
-								// 光の輪を発生させる
-								isCoinRingActive = true;
 
+								isCoinRingActive = true;
 								coinRingX = coinX + kCoinSize / 2.0f;
 								coinRingY = coinY + kCoinSize / 2.0f;
-
 								coinRingRadius = 5.0f;
 								coinRingTimer = 0;
 
-								// 1001枚目からコイン取得音を切り替える
 								int acquiredCoinSound = coinSound;
 								if (acquiredCoinSound != -1) {
 									Novice::PlayAudio(acquiredCoinSound, false, 0.1f);
@@ -2267,13 +2389,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							continue;
 						}
 
-						// ★電池(128x128)の判定を中央寄り(80x80)に計算
 						float baseItemX = static_cast<float>(x * kBonusTileSize) + 24.0f;
 						float itemY = static_cast<float>(y * kBonusTileSize) + 24.0f;
 
 						for (int i = 0; i < kMaxBonusLoops; i++) {
 
-							// 既に獲得済みなら判定を行わない
 							if (bonusItemCollected[i][y][x]) {
 								continue;
 							}
@@ -2285,14 +2405,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								player.worldLeftTop.posY < itemY + kBonusItemHitSize &&
 								player.worldLeftTop.posY + player.size.posY > itemY) {
 
-								// アイテム獲得フラグを立てて消す
 								bonusItemCollected[i][y][x] = true;
 
 								if (bonusMap[y][x] == 1) {
 									// 充電電池: バッテリー1個分回復
 									if (batteryFrame > 0) {
 										batteryFrame--;
-										batteryTimer = 0; // タイマーリセット
+										batteryTimer = 0;
 									}
 								}
 								else if (bonusMap[y][x] == 2) {
@@ -2300,7 +2419,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 									// ダメージ電池: バッテリー2個分減少
 									batteryFrame += 2;
 									if (batteryFrame >= kBatteryFrameCount - 1) {
-										batteryFrame = kBatteryFrameCount - 1; // 燃料切れの上限固定
+										batteryFrame = kBatteryFrameCount - 1;
 									}
 									batteryTimer = 0;
 								}
@@ -2395,7 +2514,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 							for (int i = 0; i < kMaxBonusLoops; i++) {
 
-								// 獲得済みなら描画しない
 								if (bonusItemCollected[i][y][x]) {
 									continue;
 								}
@@ -2450,16 +2568,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					for (int y = 0; y < kBonusCoinMapHeight; y++) {
 						for (int x = 0; x < kBonusCoinLoopTileCount; x++) {
 
-							if (bonusCoinMap[y][x] != 1 || coin == -1) {
+							int mapX = x % kBonusCoinMapWidth;
+
+							if (bonusCoinMap[y][mapX] != 1 || coin == -1) {
 								continue;
 							}
 
-							// 取得済みなら描画しない
 							if (bonusCoinCollected[loop][y][x]) {
 								continue;
 							}
 
-							// 当たり判定と同じワールド座標を使う
 							float worldX =
 								x * kBonusCoinMapSize
 								+ loop * kBonusCoinLoopWidth;
@@ -2467,14 +2585,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							int worldY =
 								y * kBonusCoinMapSize;
 
-							// ワールド座標から画面座標へ変換
 							int screenX =
 								static_cast<int>(worldX - scrollValue);
 
 							int screenY =
 								static_cast<int>(worldY);
 
-							// 画面内のコインだけ描画
 							if (screenX + kBonusCoinMapSize >= 0 &&
 								screenX <= 1280) {
 
