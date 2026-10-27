@@ -435,7 +435,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	Vector2 signboardPositions[] =
 	{
 		{ 2900.0f, 500.0f },
-		{ 4900.0f, 500.0f },
+		{ 10000.0f, 500.0f },
 	};
 	//==========================================
 	// コイン
@@ -2192,29 +2192,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						);
 					}
 
-					// ★【デバッグ用】シャチ本体の当たり判定枠を赤線で表示
-					Novice::DrawBox(
-						static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
-						static_cast<int>(enemy.position.posY + shakeOffsetY),
-						static_cast<int>(enemy.size.posX),
-						static_cast<int>(enemy.size.posY),
-						0.0f,
-						0xFF0000FF, // 赤色 (RGBA)
-						kFillModeWireFrame
-					);
-
-					// ★【デバッグ用】トランポリン判定ゾーンを赤線で表示（hasTrampolineがtrueの時のみ）
-					if (enemy.hasTrampoline) {
-						Novice::DrawBox(
-							static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
-							static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY + shakeOffsetY),
-							kTrampolineWidth,
-							20, // 跳ね返り高さの判定幅
-							0.0f,
-							0xFF0000FF, // 赤色 (RGBA)
-							kFillModeWireFrame
-						);
-					}
 				}
 
 				// ★タコ（ステージ3用敵）の描画 (ボス演出)
@@ -3747,29 +3724,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						);
 					}
 
-					// ★【デバッグ用】チュートリアル中のシャチ本体の当たり判定枠を赤線で表示
-					Novice::DrawBox(
-						static_cast<int>(enemy.position.posX - scrollValue),
-						static_cast<int>(enemy.position.posY),
-						static_cast<int>(enemy.size.posX),
-						static_cast<int>(enemy.size.posY),
-						0.0f,
-						0xFF0000FF, // 赤色 (RGBA)
-						kFillModeWireFrame
-					);
-
-					// ★【デバッグ用】チュートリアル中のトランポリン判定ゾーンを赤線で表示
-					if (enemy.hasTrampoline) {
-						Novice::DrawBox(
-							static_cast<int>(enemy.position.posX - scrollValue),
-							static_cast<int>(enemy.position.posY - 60.0f + kTrampolineOffsetY),
-							kTrampolineWidth,
-							20, // 跳ね返り高さの判定幅
-							0.0f,
-							0xFF0000FF, // 赤色 (RGBA)
-							kFillModeWireFrame
-						);
-					}
 				}
 
 				// トランポリン描画
