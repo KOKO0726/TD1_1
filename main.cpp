@@ -5,7 +5,7 @@
 #include <time.h>
 #include <stdio.h>
 
-const char kWindowTitle[] = "LC1D_12_タカハシ";
+const char kWindowTitle[] = "1166_ペンギンのはらすべり";
 
 enum GameShene
 {
