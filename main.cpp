@@ -38,12 +38,12 @@ struct Box
 // コイン取得時のパーティクル
 struct Particle
 {
-	Vector2 position;
-	Vector2 velocity;
-	int timer;
-	int lifeTime;
-	float radius;
-	bool isActive;
+	Vector2 position{};
+	Vector2 velocity{};
+	int timer = 0;
+	int lifeTime = 0;
+	float radius = 0.0f;
+	bool isActive = false;
 	unsigned int color = 0xFFFF00FF; // 初期色：黄色
 };
 
@@ -244,6 +244,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		Novice::LoadTexture("./Resources/images/goBonus.png"),
 		Novice::LoadTexture("./Resources/images/formatCoin.png"),
 		Novice::LoadTexture("./Resources/images/noDamage.png")
+	};
+	// ステージ選択用画像
+	int stageTextures[3] = {
+		Novice::LoadTexture("./Resources/images/stage1.png"),
+		Novice::LoadTexture("./Resources/images/stage2.png"),
+		Novice::LoadTexture("./Resources/images/stage3.png")
+	};
+	int stageGoldTextures[3] = {
+		Novice::LoadTexture("./Resources/images/stage1Gold.png"),
+		Novice::LoadTexture("./Resources/images/stage2Gold.png"),
+		Novice::LoadTexture("./Resources/images/stage3Gold.png")
 	};
 	//===============================
 	//数値用のリソース
@@ -690,7 +701,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		};
 
 	//==========================================
+	// オールクリア（全星獲得）時の豪華な爆発パーティクル発生関数
+	auto SpawnPerfectParticle = [&](float centerX, float centerY) {
+		int spawnedCount = 0;
+		for (int i = 0; i < kMaxParticles; i++) {
+			if (!particles[i].isActive) {
+				float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+				float speed = 6.0f + static_cast<float>(rand()) / RAND_MAX * 12.0f;
+
+				particles[i].position = { centerX, centerY };
+				particles[i].velocity = { cosf(angle) * speed, sinf(angle) * speed };
+				particles[i].timer = 0;
+				particles[i].lifeTime = 30 + rand() % 30; // 長めに余韻を残す
+				particles[i].radius = 4.0f + static_cast<float>(rand()) / RAND_MAX * 8.0f;
+
+				// 金色・水色・白・ピンクなどの華やかな色合い
+				int colorType = rand() % 4;
+				if (colorType == 0)      particles[i].color = 0xFFD700FF; // ゴールド
+				else if (colorType == 1) particles[i].color = 0xFFFF80FF; // 輝く黄白
+				else if (colorType == 2) particles[i].color = 0x00FFFFFF; // シアン
+				else                     particles[i].color = 0xFF69B4FF; // ピンク
+
+				particles[i].isActive = true;
+
+				spawnedCount++;
+				if (spawnedCount >= 50) break; // 1回で50個の豪華な粒子を放出
+			}
+		}
+		};
+
+	//==========================================
 	// メインループ
+	//==========================================
+	//==========================================
+	// メインループ（1フレームにつきBeginFrame/EndFrameを1回）
 	//==========================================
 	while (Novice::ProcessMessage() == 0 && !shouldExit) {
 
@@ -1296,31 +1340,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					Novice::DrawSprite(0, 0, backgroundTexture, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 
-				Novice::ScreenPrintf(550, 120, "SELECT STAGE");
-
+				// 各ステージのボタン画像表示位置
 				const int stageBoxX[3] = { 180, 500, 820 };
 				const int stageBoxY = 260;
-				const int boxW = 280;
-				const int boxH = 260;
-
-				const char* stageNames[3] = { "STAGE 1", "STAGE 2", "STAGE 3" };
-				const char* stageDescs[3] = { "NORMAL", "HIGH SPEED", "HARD" };
 
 				for (int i = 0; i < 3; i++) {
-					unsigned int boxColor = (i == selectedStage) ? 0xFFDD00FF : 0x444466FF;
-					Novice::DrawBox(stageBoxX[i], stageBoxY, boxW, boxH, 0.0f, boxColor, kFillModeSolid);
-					Novice::DrawBox(stageBoxX[i], stageBoxY, boxW, boxH, 0.0f, WHITE, kFillModeWireFrame);
+					// 選択中の場合はゴールド画像、非選択の場合は通常画像を使用
+					int currentTexture = (i == selectedStage) ? stageGoldTextures[i] : stageTextures[i];
 
-					Novice::ScreenPrintf(stageBoxX[i] + 100, stageBoxY + 40, "%s", stageNames[i]);
-					Novice::ScreenPrintf(stageBoxX[i] + 90, stageBoxY + 120, "%s", stageDescs[i]);
+					if (currentTexture != -1) {
+						Novice::DrawSprite(
+							stageBoxX[i],
+							stageBoxY,
+							currentTexture,
+							1.0f, 1.0f, 0.0f, WHITE
+						);
+					}
 
-					if (i == selectedStage) {
-						if (selectArrowTexture != -1) {
-							Novice::DrawSprite(stageBoxX[i] + 108, stageBoxY - 45, selectArrowTexture, 1.0f, 1.0f, 0.0f, WHITE);
-						}
+					// 選択中の矢印マークを表示
+					if (i == selectedStage && selectArrowTexture != -1) {
+						Novice::DrawSprite(
+							stageBoxX[i] + 108,
+							stageBoxY - 45,
+							selectArrowTexture,
+							1.0f, 1.0f, 0.0f, WHITE
+						);
 					}
 				}
 
+				// 「PUSH SPACE」の点滅表示
 				if (pushSpaceTexture != -1 && (timer / 30) % 2 == 0) {
 					Novice::DrawSprite(500, 580, pushSpaceTexture, 2.0f, 2.0f, 0.0f, WHITE);
 				}
@@ -2989,10 +3037,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			case Clear: {
 				clearTimer++;
 
-				// ★ リザルト音の再生（クリア画面に入った最初の1フレーム目のみ） ★
+				// ★ リザルト音の再生 & 前ステージの残存パーティクルを全クリア ★
 				if (clearTimer == 1) {
 					if (resultSound != -1) {
 						Novice::PlayAudio(resultSound, false, 0.3f);
+					}
+					for (int i = 0; i < kMaxParticles; i++) {
+						particles[i].isActive = false;
+					}
+				}
+
+				// クリア画面の更新処理（パーティクルの移動・減速）
+				for (int i = 0; i < kMaxParticles; i++) {
+					if (particles[i].isActive) {
+						particles[i].position.posX += particles[i].velocity.posX;
+						particles[i].position.posY += particles[i].velocity.posY;
+
+						particles[i].velocity.posX *= 0.95f;
+						particles[i].velocity.posY *= 0.95f;
+						particles[i].radius *= 0.97f;
+
+						particles[i].timer++;
+						if (particles[i].timer >= particles[i].lifeTime) {
+							particles[i].isActive = false;
+						}
 					}
 				}
 
@@ -3014,7 +3082,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					int starElapsed = clearTimer - (i + 1) * kStarInterval;
 					if (starElapsed < 0) continue;
 
-					// ★追加: 条件を満たしている星（獲得できた星）の登場瞬間だけ効果音を鳴らす
+					// ★ 条件を満たしている星の登場瞬間だけ効果音を鳴らす
 					if (starElapsed == 0 && starConditions[i]) {
 						if (starSound != -1) {
 							Novice::PlayAudio(starSound, false, 0.8f);
@@ -3046,9 +3114,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							0.65f, 0.65f, 0.0f, WHITE);
 					}
 				}
+
 				// 獲得星数を数字画像で表示
 				if (clearTimer >= 4 * kStarInterval + 16) {
-					// クリア画面の獲得星数：数字とスラッシュを小さくして画面内に収める
 					const float digitScale = 0.05f;
 					const float slashScale = 0.30f;
 					if (countTextures[starCount] != -1)
@@ -3058,20 +3126,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (countTextures[4] != -1)
 						Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
 				}
-				// 4つの星をすべて獲得したときだけPERFECTを表示
-				// 4つ目の星の登場アニメーションが終わってから表示
+
+				// 4つの星をすべて獲得したときだけPERFECTと豪華な爆発パーティクルを表示
 				if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
 					int perfectElapsed = clearTimer - 110;
 					float perfectScale = 1.0f;
 					if (perfectElapsed < 10) {
 						perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
-						if (perfectElapsed == 0 && starSound != -1) {
-							Novice::PlayAudio(starSound, false, 1.0f);
+						if (perfectElapsed == 0) {
+							if (starSound != -1) {
+								Novice::PlayAudio(starSound, false, 1.0f);
+							}
+							// ★4つの星全部ゲット時のパーティクル発動
+							SpawnPerfectParticle(640.0f, 300.0f);
 						}
 					}
 					else if (perfectElapsed < 20) {
 						perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
 					}
+
 					// perfect.png は400x200。上部中央に表示
 					const int perfectWidth = 400;
 					const int perfectHeight = 200;
@@ -3080,6 +3153,33 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					Novice::DrawSprite(perfectX, perfectY, perfectTexture,
 						perfectScale, perfectScale, 0.0f, WHITE);
 				}
+
+				// ★クリア画面専用のパーティクル描画処理
+				for (int i = 0; i < kMaxParticles; i++) {
+					if (particles[i].isActive) {
+						// 外側のキラキラ光枠
+						Novice::DrawEllipse(
+							(int)particles[i].position.posX,
+							(int)particles[i].position.posY,
+							(int)(particles[i].radius * 1.5f),
+							(int)(particles[i].radius * 1.5f),
+							0,
+							particles[i].color,
+							kFillModeSolid
+						);
+						// 内側の白いコア
+						Novice::DrawEllipse(
+							(int)particles[i].position.posX,
+							(int)particles[i].position.posY,
+							(int)particles[i].radius,
+							(int)particles[i].radius,
+							0,
+							WHITE,
+							kFillModeSolid
+						);
+					}
+				}
+
 				if (clearTimer >= kClearShowFrames) {
 					scene = Title;
 					timer = 0;
@@ -3932,8 +4032,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		}
 
 		Novice::EndFrame();
-
 	}
+
 	Novice::Finalize();
 	return 0;
 }
