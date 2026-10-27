@@ -74,9 +74,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	float savedPlayerX = 0.0f;
 	//========================================
-	// ライフと無敵時間（エネミー当たり判定用）
+	// // ライフと無敵時間（エネミー当たり判定用）
 	//========================================
 	int playerLife = 3;
+	int maxPlayerLife = 3; // ★追加：最大ライフを保持する変数
 	bool isInvincible = false;
 	int invincibleTimer = 0;
 	const int kInvincibleDuration = 120; // ダメージ後約2秒間の無敵時間
@@ -122,11 +123,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// チュートリアル用ガイド変数
 	//==========================================
 	bool isTutorialPaused = false;
-	bool isStartGuideDone = false;       
-	bool isTrampolineGuideDone = false;  
-	int tutorialPauseType = 0;           
-	int tutorialStep = 1;                
-	bool isWaitingForPeak = false;       
+	bool isStartGuideDone = false;
+	bool isTrampolineGuideDone = false;
+	int tutorialPauseType = 0;
+	int tutorialStep = 1;
+	bool isWaitingForPeak = false;
 
 	//==========================================
 	// ジャンプ
@@ -263,6 +264,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//ライフの画像
 	int playerLifeTexture =
 		Novice::LoadTexture("./Resources/images/life.png");
+	//壊れたライフの画像
+	int playerBrokenLifeTexture =
+		Novice::LoadTexture("./Resources/images/brokenlife.png");
+
 	//チュートリアル説明用画像
 	int tutorialTextTexture =
 		Novice::LoadTexture("./Resources/images/tutorialText.png");
@@ -638,6 +643,46 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					else                     particles[i].color = 0xFFFFCCFF; // キラッと光る薄黄色
 
 					particles[i].isActive = true;
+					break;
+				}
+			}
+		}
+		};
+
+	//★修正：新しい華やか＆安全な花火エフェクト処理（フリーズ対策済）
+	auto SpawnFireworks = [&](float x, float y) {
+		const int kFireworkParticles = 60; // 花火1発あたりの粒子数
+		int spawnedCount = 0;
+
+		// 空いているパーティクル枠を探して生成（無限ループを起こさない安全な単一ループ構造）
+		for (int p = 0; p < kMaxParticles; ++p) {
+			if (!particles[p].isActive) {
+				// 花火の中心位置
+				particles[p].position = { x, y };
+
+				// 360度ランダムな角度とスピードで外側へ飛び散るベクトル
+				float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+				float speed = 4.0f + static_cast<float>(rand()) / RAND_MAX * 10.0f;
+
+				particles[p].velocity = { cosf(angle) * speed, sinf(angle) * speed };
+				particles[p].timer = 0;
+				particles[p].lifeTime = 25 + rand() % 20; // 25〜45フレーム存続
+				particles[p].radius = 3.0f + static_cast<float>(rand() % 6);
+
+				// 鮮やかでランダムなカラーバリエーション
+				int colorType = rand() % 6;
+				if (colorType == 0)      particles[p].color = 0xFFD700FF; // ゴールド
+				else if (colorType == 1) particles[p].color = 0xFF1493FF; // ピンク
+				else if (colorType == 2) particles[p].color = 0x00FFFFFF; // シアン
+				else if (colorType == 3) particles[p].color = 0x32CD32FF; // ライムグリーン
+				else if (colorType == 4) particles[p].color = 0xFFFFFFFF; // ホワイト
+				else                     particles[p].color = 0xFF8C00FF; // オレンジ
+
+				particles[p].isActive = true;
+				spawnedCount++;
+
+				// 目標の粒子数（60個）を生成できたら終了
+				if (spawnedCount >= kFireworkParticles) {
 					break;
 				}
 			}
@@ -1200,6 +1245,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (selectedStage == 0) { // STAGE 1 (NORMAL)
 						kMoveSpeed = 10.0f;
 						playerLife = 3;
+						maxPlayerLife = 3; // ★追加
 						enemy.speed = 8.0f;
 						enemy.isActive = true;
 						octopus.isActive = false;
@@ -1207,6 +1253,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					else if (selectedStage == 1) { // STAGE 2 (HIGH SPEED)
 						kMoveSpeed = 14.0f;
 						playerLife = 3;
+						maxPlayerLife = 3; // ★追加
 						enemy.speed = 10.0f;
 						enemy.isActive = true;
 						octopus.isActive = false;
@@ -1214,13 +1261,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					else if (selectedStage == 2) { // STAGE 3 (HARD)
 						kMoveSpeed = 12.0f;
 						playerLife = 1;
+						maxPlayerLife = 1; // ★追加
 						enemy.speed = 12.0f;
 
-						// ★ステージ3限定：シャチ非表示、タコアクティブ
+						// ステージ3限定：シャチ非表示、タコアクティブ
 						enemy.isActive = false;
 						octopus.isActive = true;
 						octopus.position = { 1280.0f + 300.0f, 250.0f };
-						octopus.shakeTimer = 30; // 登場時に約0.5秒画面揺らし
+						octopus.shakeTimer = 30;
 					}
 
 					scene = CountDown;
@@ -1841,10 +1889,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 					isGameClear = true;
 
-					// ★ ここにゴール効果音の再生処理を追加 ★
+					// ゴール効果音の再生
 					if (goalHitSound != -1) {
-						Novice::PlayAudio(goalHitSound, false, 1.0f); // 音量は好みに合わせて調整してください
+						Novice::PlayAudio(goalHitSound, false, 1.0f);
 					}
+
+					// 初回花火の打ち上げ（ゴール直後に2発）
+					SpawnFireworks(kGoalX + 50.0f, kGoalY - 100.0f);
+					SpawnFireworks(kGoalX + 150.0f, kGoalY - 150.0f);
 
 					// ゴール時に4つの星の条件を確定
 					starConditions[0] = true;
@@ -1863,6 +1915,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				if (isGameClear) {
 					goalTimer++;
 					if (goalTimer % 8 == 0 && goalFlagFrame < 3) goalFlagFrame++;
+
+					// 20フレームごとにポンポンと連続して花火を打ち上げる演出
+					if (goalTimer % 20 == 0 && goalTimer < kGoalWaitFrames - 30) {
+						float fireworkX = kGoalX + (rand() % 300 - 50);
+						float fireworkY = kGoalY - 80.0f - (rand() % 120);
+						SpawnFireworks(fireworkX, fireworkY);
+
+						// 花火の破裂音（ジャンプ音などを流用して演出感をアップ）
+						if (jumpSound != -1) {
+							Novice::PlayAudio(jumpSound, false, 0.5f);
+						}
+					}
+
 					if (goalTimer >= kGoalWaitFrames) {
 						scene = Clear;
 						clearTimer = 0;
@@ -2158,13 +2223,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				DrawCoinCount();
 
 				//==========================================
-				// ライフ描画（残数に応じて描画）
+				// ライフ描画（残数と壊れたライフを描画）
 				//==========================================
-				if (playerLifeTexture != -1) {
-					for (int i = 0; i < playerLife; i++) {
+				for (int i = 0; i < maxPlayerLife; i++) {
+					int drawTexture = -1;
+
+					// 現在のライフ以下なら通常ライフ、それ以上（減ったぶん）なら壊れたライフを表示
+					if (i < playerLife) {
+						drawTexture = playerLifeTexture;
+					}
+					else {
+						drawTexture = playerBrokenLifeTexture;
+					}
+
+					if (drawTexture != -1) {
 						Novice::DrawSprite(
 							20 + i * 60, 20,  // 描画位置
-							playerLifeTexture,
+							drawTexture,
 							0.5f, 0.5f,       // 画像の大きさ
 							0.0f, WHITE
 						);
