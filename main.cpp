@@ -387,6 +387,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	// 5秒タイマー用変数追加
 	int bossSpawnTimer = 0;
+	bool bossDefeated = false; // ボスを倒したら再出現させないためのフラグ
 
 	// ボスHP（初期HPは50）と、着地時にHPバーを回転表示する演出
 	int bossHP = 50;
@@ -1012,6 +1013,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						speedBoostTimer = 0;
 						bossOokami.isActive = false;
 						bossSpawnTimer = 0;
+						bossDefeated = false;
 						isEnemyBlownAway = false;
 						isPunching = false;
 						punchFrame = 0;
@@ -1240,6 +1242,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 							bossOokami.isActive = false;
 							bossSpawnTimer = 0;
+							bossDefeated = false;
 							isEnemyBlownAway = false;
 							isPunching = false;
 							punchFrame = 0;
@@ -1556,10 +1559,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						maxPlayerLife = 3; // ★追加
 						enemy.speed = 12.0f;
 
-						// ステージ3限定：シャチ非表示
-						enemy.isActive = false;
+						// ステージ3：オオカミが出るまでは通常どおりシャチを出す
+						enemy.isActive = true;
 						bossOokami.isActive = false;
 						bossSpawnTimer = 0;
+						bossDefeated = false;
 						isEnemyBlownAway = false;
 						enemyBlowVelocityX = 15.0f;
 						enemyBlowVelocityY = -20.0f;
@@ -1597,9 +1601,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// 通常ゲーム開始時の位置セット
 					player.worldLeftTop = { 10.0f, 500.0f };
 					enemy.position = { 1280.0f + 200.0f, 480.0f }; // シャチのY位置をさらに下に調整
-					if (selectedStage != 2) {
-						enemy.isActive = true;
-					}
+					enemy.isActive = true; // ステージ3でもシャチを出す（オオカミ登場まで）
 					enemy.hasTrampoline = (rand() % 2 == 0);
 
 				}
@@ -1754,7 +1756,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 
 				// ステージ3専用: ゲーム開始5秒後にボス出現開始
-				if (selectedStage == 2 && !bossOokami.isActive) {
+				if (selectedStage == 2 && !bossOokami.isActive && !bossDefeated) {
 					bossSpawnTimer++;
 
 					// ボス出現の2秒前から通常BGMを徐々に小さくする
@@ -1834,6 +1836,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							penguinBullets[i].isActive = false;
 							if (bossHP <= 0) {
 								bossOokami.isActive = false;
+								bossDefeated = true; // 倒したので以後は出現させない
+								isPunching = false;
+								punchFrame = 0;
+								punchAnimTimer = 0;
+								isWaveActive = false;
+								for (int w = 0; w < kMaxWaveHands; w++) {
+									waveHands[w].isActive = false;
+								}
 								bossSpawnTimer = 0;
 								bossHPBarSpinTimer = 0;
 							}
@@ -2533,8 +2543,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// ゴール到達：ペンギンがかまくらに触れたら停止
-				if (!isGameClear && !isTransitioningToBonus &&
+				// ゴール到達：ペンギンがかまくらに触れたら停止（ステージ3にはゴールなし）
+				if (selectedStage != 2 && !isGameClear && !isTransitioningToBonus &&
 					player.worldLeftTop.posX + player.size.posX > kGoalX &&
 					player.worldLeftTop.posX < kGoalX + 200.0f &&
 					player.worldLeftTop.posY + player.size.posY > kGoalY) {
@@ -2595,8 +2605,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					player.worldLeftTop.posX = 0.0f;
 				}
 
-				// ゴールより先に進めないようにする
-				if (player.worldLeftTop.posX >
+				// ゴールより先に進めないようにする（ステージ3はゴールなし）
+				if (selectedStage != 2 && player.worldLeftTop.posX >
 					kGoalX + 200.0f - player.size.posX) {
 
 					player.worldLeftTop.posX =
@@ -2766,15 +2776,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// かまくらと旗（旗は192x48、48x48の4コマ）
-				if (goalHouseTexture != -1) {
-					Novice::DrawSprite(static_cast<int>(kGoalX - scrollValue + shakeOffsetX),
-						static_cast<int>(kGoalY + shakeOffsetY), goalHouseTexture, 1.0f, 1.0f, 0.0f, WHITE);
-				}
-				if (goalFlagTexture != -1) {
-					Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue + shakeOffsetX),
-						static_cast<int>(kGoalY + 28.0f + shakeOffsetY), goalFlagFrame * 48, 0,
-						48, 48, goalFlagTexture, 0.375f, 1.5f, 0.0f, WHITE);
+				// かまくらと旗（旗は192x48、48x48の4コマ）（ステージ3は描画しない）
+				if (selectedStage != 2) {
+					if (goalHouseTexture != -1) {
+						Novice::DrawSprite(static_cast<int>(kGoalX - scrollValue + shakeOffsetX),
+							static_cast<int>(kGoalY + shakeOffsetY), goalHouseTexture, 1.0f, 1.0f, 0.0f, WHITE);
+					}
+					if (goalFlagTexture != -1) {
+						Novice::DrawSpriteRect(static_cast<int>(kGoalX + 120.0f - scrollValue + shakeOffsetX),
+							static_cast<int>(kGoalY + 28.0f + shakeOffsetY), goalFlagFrame * 48, 0,
+							48, 48, goalFlagTexture, 0.375f, 1.5f, 0.0f, WHITE);
+					}
 				}
 
 				// シャチ（敵）の描画
@@ -4037,6 +4049,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					speedBoostTimer = 0;
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
+					bossDefeated = false;
 					isEnemyBlownAway = false;
 					isPunching = false;
 					punchFrame = 0;
@@ -4117,7 +4130,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						playerLife = 3;
 						maxPlayerLife = 3;
 						enemy.speed = 12.0f;
-						enemy.isActive = false;
+						enemy.isActive = true; // ステージ3も最初はシャチを出す
 					}
 
 					// プレイヤー・ゲーム変数のリセット
@@ -4165,6 +4178,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// ステージ3（オオカミ戦）関連の状態リセット（Rキーリスタート用）
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
+					bossDefeated = false;
 					bossHP = kBossMaxHP;
 					bossHPBarSpinTimer = 0;
 					bossIsJumping = false;
@@ -4242,6 +4256,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					speedBoostTimer = 0;
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
+					bossDefeated = false;
 					isEnemyBlownAway = false;
 					isPunching = false;
 					punchFrame = 0;
