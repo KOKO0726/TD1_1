@@ -59,6 +59,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	char preKeys[256] = { 0 };
 
 	//==========================================
+	// 画面シェイク用変数（main1より追加）
+	//==========================================
+	int shakeTimer = 0;
+	float shakeAmount = 0.0f;
+	float shakeX = 0.0f;
+	float shakeY = 0.0f;
+
+	//==========================================
 	// プレイヤー
 	//==========================================
 	Box player{};
@@ -156,11 +164,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	// 画像
 	//==========================================
+	// ★main1より追加: オオカミ・ジャンプ演出用テクスチャ
+	int jannpuTexture =
+		Novice::LoadTexture("./Resources/images/jannpu.png");
+	int jannpu1Texture =
+		Novice::LoadTexture("./Resources/images/jannpu1.png");
+	int ookamiTexture =
+		Novice::LoadTexture("./Resources/images/ookami.png");
+	int panntiTexture =
+		Novice::LoadTexture("./Resources/images/pannti.png");
+	int teTexture =
+		Novice::LoadTexture("./Resources/images/te.png");
+
 	int enemyTexture =
 		Novice::LoadTexture("./Resources/images/enemy.png");
-	// タコ（ステージ3用敵）
-	int octopusTexture =
-		Novice::LoadTexture("./Resources/images/octopus.png");
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
@@ -227,6 +244,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// コイン
 	int coin =
 		Novice::LoadTexture("./Resources/images/coin.png");
+	// ペンギンが撃つ弾
+	int tamaTexture =
+		Novice::LoadTexture("./Resources/images/tama.png");
 	//看板
 	int signboard =
 		Novice::LoadTexture("./Resources/images/signboard.png");
@@ -320,24 +340,91 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	enemy.isActive = true;
 	enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付き
 
+	// 敵吹き飛ぶ用変数追加
+	bool isEnemyBlownAway = false;
+	float enemyBlowVelocityX = 15.0f;
+	float enemyBlowVelocityY = -20.0f;
+	float enemyRotationAngle = 0.0f;
+
 	//==========================================
-	// ステージ3用敵（タコ）の設定
+	// スクロール基本・地面基準設定（main1より追加）
 	//==========================================
-	struct Octopus
+	const float kBossBaseGroundY = 500.0f; // main側のkGroundY(後方で宣言)と同じ値。宣言順の都合で別名にしている
+
+	//==========================================
+	// ボス（オオカミ）の設定（main1より追加）
+	//==========================================
+	struct BossOokami
 	{
 		Vector2 position;
 		Vector2 size;
-		float speed;
+		int currentFrame;
+		int animTimer;
+		const int frameCount = 5;
 		bool isActive;
-		int shakeTimer; // 画面揺らし用タイマー
 	};
 
-	Octopus octopus{};
-	octopus.size = { 128.0f, 128.0f };
-	octopus.speed = 14.0f; // 右から左に移動してくるスピード
-	octopus.position = { 1280.0f + 300.0f, 250.0f }; // 初期出現位置（画面外の右）
-	octopus.isActive = false;
-	octopus.shakeTimer = 0;
+	const float kBossScreenX = 1000.0f; // 画面上に固定表示する画面X座標
+
+	BossOokami bossOokami{};
+	bossOokami.size = { 80.0f, 80.0f }; // 当たり判定はペンギンと同じサイズ
+	bossOokami.position = { kBossScreenX, kBossBaseGroundY + kPlayerOffsetY - 80.0f };
+	bossOokami.currentFrame = 0;
+	bossOokami.animTimer = 0;
+	bossOokami.isActive = false;
+
+	// オオカミがたまに少しだけジャンプするための設定
+	const float kBossGroundY = kBossBaseGroundY + kPlayerOffsetY - 80.0f;
+	const float kBossJumpPower = 10.0f;
+	const float kBossJumpGravity = 0.32f;
+	float bossJumpVelocityY = 0.0f;
+	int bossJumpCooldown = 240;
+	bool bossIsJumping = false;
+
+	const float kBossDrawSize = 256.0f; // 1コマの幅・高さ
+	const float kBossOffsetX = (kBossDrawSize - bossOokami.size.posX) * 0.5f;
+	const float kBossOffsetY = (kBossDrawSize - bossOokami.size.posY) * 0.5f;
+
+	// 5秒タイマー用変数追加
+	int bossSpawnTimer = 0;
+
+	// ボスHP（初期HPは50）と、着地時にHPバーを回転表示する演出
+	int bossHP = 50;
+	const int kBossMaxHP = 50;
+	int bossHPBarSpinTimer = 0;
+	const int kBossHPBarSpinDuration = 60; // 約1秒かけて回転して登場
+
+	// パンチ（攻撃）アニメーション制御用変数
+	bool isPunching = false;
+	int punchFrame = 0;
+	int punchAnimTimer = 0;
+	int punchCoolTimer = 0;
+	int punchInterval = 120 + (rand() % 180); // 最初は2〜5秒の間でランダム
+
+	// 波動（手の攻撃エフェクト：te.png 1枚絵）制御用構造体＆変数
+	struct WaveHand {
+		float screenX;
+		float screenY;
+		int lifeTimer;
+		bool isActive;
+		bool isFadingOut; // 消滅処理フラグ
+	};
+
+	const int kMaxWaveHands = 15;
+	WaveHand waveHands[kMaxWaveHands] = {};
+	bool isWaveActive = false;
+	int waveTimer = 0;
+	int waveSpawnCount = 0;
+	const int kMaxWaveCount = 10; // 波動として画面最左端（0px）付近までしっかり伸ばすためにカウントを増加
+
+	// 波動消去制御用変数
+	int waveEraseTimer = 0;
+	int waveEraseIndex = 0;
+
+	// 上から落ちてくるジャンプ画像の座標制御・着地演出タイマー
+	float jannpuPosY = -200.0f; // 画面上部外側からスタート
+	int jannpuLandingTimer = 0;  // 着地後の表示維持タイマー
+	const int kMaxLandingTime = 120; // jannpu1.png を表示するフレーム数（約2秒間）
 
 	// 画面シェイク（揺れ）オフセット値
 	float shakeOffsetX = 0.0f;
@@ -359,6 +446,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	int jumpSound =
 		Novice::LoadAudio("./Resources/sound/jump.MP3");
+
+	// 狼が地面に着地したときの効果音
+	int otiruSound =
+		Novice::LoadAudio("./Resources/sound/otiru.MP3");
+
+	// pannti.png の10枚目で鳴らす効果音
+	int panntiSound =
+		Novice::LoadAudio("./Resources/sound/pannti.MP3");
+
+	// te.png が出てきたときの効果音
+	int teSound =
+		Novice::LoadAudio("./Resources/sound/te.MP3");
 
 	int cursorSound =
 		Novice::LoadAudio("./Resources/sound/cursor.MP3");
@@ -402,12 +501,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//ボーナスステージ
 	int kBonusHandle =
 		Novice::LoadAudio("./Resources/bgm/bonus.MP3");
+	// ボス出現時のBGM
+	int bosusennHandle =
+		Novice::LoadAudio("./Resources/bgm/bosusenn.MP3");
 
 	// BGMの再生ハンドル
 	int titlePlayHandle = -1;
 	int stagePlayHandle = -1;
 	int bonusPlayHandle = -1;
 	int tutorialPlayHandle = -1;
+	int bossPlayHandle = -1;
 
 	if (kTitleHandle != -1) {
 		titlePlayHandle =
@@ -449,6 +552,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const int kCoinMapSize = 64;
 	const float kCoinSize = 48.0f;
 	int coinCount = 0;
+	// ステージ3専用：コイン20枚で弾が撃てるようになる
+	int stage3ChargeCoinCount = 0;
+	const int kCoinsToUnlockShot = 20;
+	// ステージ3：コインを20枚集めるたびに、2秒間だけ攻撃力が2倍になる
+	int stage3CoinsTowardPowerBoost = 0;
+	int stage3PowerBoostTimer = 0;
+	const int kPowerBoostDuration = 120; // 60FPSで約2秒
+	auto OnStage3CoinCollected = [&]() {
+		if (selectedStage == 2) {
+			if (stage3ChargeCoinCount < kCoinsToUnlockShot) {
+				stage3ChargeCoinCount++;
+			}
+			stage3CoinsTowardPowerBoost++;
+			if (stage3CoinsTowardPowerBoost >= kCoinsToUnlockShot) {
+				stage3CoinsTowardPowerBoost = 0;
+				stage3PowerBoostTimer = kPowerBoostDuration;
+			}
+		}
+		};
+	struct PenguinBullet { Vector2 position{}; bool isActive = false; };
+	const int kMaxPenguinBullets = 20;
+	PenguinBullet penguinBullets[kMaxPenguinBullets] = {};
+	int penguinShotCoolDown = 0;
+	const int kPenguinShotInterval = 18;
 	// ステージのコイン配置マップ（1: コインあり, 0: コインなし）
 	int coinMap[kCoinMapHeight][kCoinMapWidth] =
 	{
@@ -462,7 +589,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	// コインパーティクル
 	//==========================================
-	const int kMaxParticles = 120;
+	const int kMaxParticles = 500;
 	Particle particles[kMaxParticles]{};
 
 	const int kParticleLifeTime = 40;
@@ -545,6 +672,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	float scrollValue = 0.0f;
 	const float scrollStartPositionX = 500.0f;
 	const float kGroundY = 500.0f;
+	const float kStage3ScrollStartPositionX = 380.0f; // ステージ3ではペンギンを少し後ろ（左）に表示
 
 	//==========================================
 	// シーン
@@ -735,6 +863,66 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 		};
 
 	//==========================================
+	// 超ド派手なパーティクル（狼の着地・パンチ10枚目用）
+	auto SpawnMegaBurst = [&](float centerX, float centerY) {
+		int spawnedCount = 0;
+		const int kMegaParticleCount = 220;
+		for (int i = 0; i < kMaxParticles; i++) {
+			if (!particles[i].isActive) {
+				float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+				float speed = 5.0f + static_cast<float>(rand()) / RAND_MAX * 17.0f;
+				particles[i].position = { centerX, centerY };
+				particles[i].velocity = { cosf(angle) * speed, sinf(angle) * speed - 2.0f };
+				particles[i].timer = 0;
+				particles[i].lifeTime = 35 + rand() % 35;
+				particles[i].radius = 8.0f + static_cast<float>(rand() % 15);
+				int colorType = rand() % 6;
+				if (colorType == 0) particles[i].color = 0xFFD700FF;      // 金色
+				else if (colorType == 1) particles[i].color = 0xFF1493FF; // ピンク
+				else if (colorType == 2) particles[i].color = 0x00FFFFFF; // シアン
+				else if (colorType == 3) particles[i].color = 0xFFFFFFFF; // 白
+				else if (colorType == 4) particles[i].color = 0xA020F0FF; // 紫
+				else particles[i].color = 0xFF8C00FF;                    // オレンジ
+				particles[i].isActive = true;
+				spawnedCount++;
+				if (spawnedCount >= kMegaParticleCount) break;
+			}
+		}
+		};
+
+	//==========================================
+	// 地面を殴った時の軽量な衝撃演出（フリーズ対策）
+	auto SpawnGroundSlam = [&](float centerX, float groundY) {
+		// 10枚目で大爆発を重ねると負荷が高くなるため、大爆発は使わない
+		int spawnedCount = 0;
+		const int kGroundDustCount = 30;
+		for (int i = 0; i < kMaxParticles; i++) {
+			if (!particles[i].isActive) {
+				// 地面に沿って左右へ広がる砂煙と火花
+				float direction = (rand() % 2 == 0) ? -1.0f : 1.0f;
+				float speedX = 2.0f + static_cast<float>(rand() % 70) / 10.0f;
+				float speedY = -(1.0f + static_cast<float>(rand() % 40) / 10.0f);
+				particles[i].position = {
+					centerX + static_cast<float>(rand() % 25 - 12),
+					groundY - static_cast<float>(rand() % 8)
+				};
+				particles[i].velocity = { speedX * direction, speedY };
+				particles[i].timer = 0;
+				particles[i].lifeTime = 16 + rand() % 12;
+				particles[i].radius = 3.0f + static_cast<float>(rand() % 7);
+				int colorType = rand() % 4;
+				if (colorType == 0) particles[i].color = 0xFFFFFFFF;      // 白い衝撃光
+				else if (colorType == 1) particles[i].color = 0xFFD700FF; // 金色
+				else if (colorType == 2) particles[i].color = 0xB0B0B0FF; // 砂煙
+				else particles[i].color = 0xFF8C00FF;                    // オレンジの火花
+				particles[i].isActive = true;
+				spawnedCount++;
+				if (spawnedCount >= kGroundDustCount) break;
+			}
+		}
+		};
+
+	//==========================================
 	// メインループ
 	//==========================================
 	//==========================================
@@ -746,6 +934,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 		memcpy(preKeys, keys, 256);
 		Novice::GetHitKeyStateAll(keys);
+
+		//==========================================
+		// 画面シェイク更新処理（main1より追加）
+		//==========================================
+		if (shakeTimer > 0) {
+			shakeTimer--;
+			shakeX = (static_cast<float>(rand() % 100) / 100.0f * 2.0f - 1.0f) * shakeAmount;
+			shakeY = (static_cast<float>(rand() % 100) / 100.0f * 2.0f - 1.0f) * shakeAmount;
+		}
+		else {
+			shakeX = 0.0f;
+			shakeY = 0.0f;
+		}
 
 		// ESCでポーズ。上下で選択、SPACEで決定
 		if (scene == Game || scene == BonusStage || scene == tutorial) {
@@ -809,7 +1010,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						isSpeedBoostActive = false;
 						hasSpeedBoostTriggered = false;
 						speedBoostTimer = 0;
-						octopus.isActive = false;
+						bossOokami.isActive = false;
+						bossSpawnTimer = 0;
+						isEnemyBlownAway = false;
+						isPunching = false;
+						punchFrame = 0;
+						punchAnimTimer = 0;
+						punchCoolTimer = 0;
+						isWaveActive = false;
+						waveTimer = 0;
+						waveSpawnCount = 0;
+						waveEraseTimer = 0;
+						waveEraseIndex = 0;
+						for (int i = 0; i < kMaxWaveHands; i++) {
+							waveHands[i].isActive = false;
+							waveHands[i].isFadingOut = false;
+							waveHands[i].lifeTimer = 0;
+						}
 
 						memset(starConditions, 0, sizeof(starConditions));
 						memcpy(coinMap, initialCoinMap, sizeof(coinMap));
@@ -1021,7 +1238,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							enemy.isActive = false;
 							enemy.hasTrampoline = true; // チュートリアルはトランポリン付きで固定
 
-							octopus.isActive = false;
+							bossOokami.isActive = false;
+							bossSpawnTimer = 0;
+							isEnemyBlownAway = false;
+							isPunching = false;
+							punchFrame = 0;
+							punchAnimTimer = 0;
+							punchCoolTimer = 0;
+							isWaveActive = false;
+							waveTimer = 0;
+							waveSpawnCount = 0;
+							waveEraseTimer = 0;
+							waveEraseIndex = 0;
+							for (int i = 0; i < kMaxWaveHands; i++) {
+								waveHands[i].isActive = false;
+								waveHands[i].isFadingOut = false;
+								waveHands[i].lifeTimer = 0;
+							}
 
 							// 最初は画面停止（ポーズ）でプレイヤーのSPACE開始入力を待つ
 							isTutorialPaused = true;
@@ -1300,7 +1533,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						maxPlayerLife = 3; // ★追加
 						enemy.speed = 8.0f;
 						enemy.isActive = true;
-						octopus.isActive = false;
+						bossOokami.isActive = false;
 					}
 					else if (selectedStage == 1) { // STAGE 2 (HIGH SPEED)
 						kMoveSpeed = 14.0f;
@@ -1308,19 +1541,47 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						maxPlayerLife = 3; // ★追加
 						enemy.speed = 10.0f;
 						enemy.isActive = true;
-						octopus.isActive = false;
+						bossOokami.isActive = false;
 					}
 					else if (selectedStage == 2) { // STAGE 3 (HARD)
+						stage3ChargeCoinCount = 0;
+						stage3CoinsTowardPowerBoost = 0;
+						stage3PowerBoostTimer = 0;
+						penguinShotCoolDown = 0;
+						for (int i = 0; i < kMaxPenguinBullets; i++) {
+							penguinBullets[i].isActive = false;
+						}
 						kMoveSpeed = 12.0f;
-						playerLife = 1;
-						maxPlayerLife = 1; // ★追加
+						playerLife = 3;
+						maxPlayerLife = 3; // ★追加
 						enemy.speed = 12.0f;
 
-						// ステージ3限定：シャチ非表示、タコアクティブ
+						// ステージ3限定：シャチ非表示
 						enemy.isActive = false;
-						octopus.isActive = true;
-						octopus.position = { 1280.0f + 300.0f, 250.0f };
-						octopus.shakeTimer = 30;
+						bossOokami.isActive = false;
+						bossSpawnTimer = 0;
+						isEnemyBlownAway = false;
+						enemyBlowVelocityX = 15.0f;
+						enemyBlowVelocityY = -20.0f;
+						enemyRotationAngle = 0.0f;
+						isPunching = false;
+						punchFrame = 0;
+						punchAnimTimer = 0;
+						punchCoolTimer = 0;
+						isWaveActive = false;
+						waveTimer = 0;
+						waveSpawnCount = 0;
+						waveEraseTimer = 0;
+						waveEraseIndex = 0;
+						for (int i = 0; i < kMaxWaveHands; i++) {
+							waveHands[i].isActive = false;
+							waveHands[i].isFadingOut = false;
+							waveHands[i].lifeTimer = 0;
+						}
+
+						jannpuPosY = -200.0f;
+						jannpuLandingTimer = 0;
+						shakeTimer = 0;
 					}
 
 					scene = CountDown;
@@ -1492,6 +1753,99 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				//==========================================
 				stageSet = static_cast<int>(player.worldLeftTop.posX / kStageWidth);
 
+				// ステージ3専用: ゲーム開始5秒後にボス出現開始
+				if (selectedStage == 2 && !bossOokami.isActive) {
+					bossSpawnTimer++;
+
+					// ボス出現の2秒前から通常BGMを徐々に小さくする
+					if (bossSpawnTimer >= 180 && bossSpawnTimer < 300 && stagePlayHandle != -1) {
+						float fadeProgress = static_cast<float>(bossSpawnTimer - 180) / 120.0f;
+						float bgmVolume = 0.5f * (1.0f - fadeProgress);
+						if (bgmVolume < 0.0f) bgmVolume = 0.0f;
+						Novice::SetAudioVolume(stagePlayHandle, bgmVolume);
+					}
+
+					if (bossSpawnTimer >= 300) { // 5秒経過（60fps × 5秒 = 300）
+						bossOokami.isActive = true;
+						bossOokami.position.posY = kBossGroundY;
+						bossJumpVelocityY = 0.0f;
+						bossJumpCooldown = 180 + (rand() % 180); // 約3〜6秒ごと
+						bossIsJumping = false;
+						bossHP = kBossMaxHP;
+						bossHPBarSpinTimer = 0;
+						jannpuPosY = -200.0f;
+						jannpuLandingTimer = 0;
+					}
+				}
+
+				// ステージ3：コイン20枚を集めると自動で弾を撃つ
+				if (selectedStage == 2) {
+					if (stage3PowerBoostTimer > 0) {
+						stage3PowerBoostTimer--;
+					}
+					if (penguinShotCoolDown > 0) {
+						penguinShotCoolDown--;
+					}
+
+					// メーターが最大になったら、一定間隔で自動発射
+					if (stage3ChargeCoinCount >= kCoinsToUnlockShot &&
+						penguinShotCoolDown == 0) {
+						for (int i = 0; i < kMaxPenguinBullets; i++) {
+							if (!penguinBullets[i].isActive) {
+								penguinBullets[i].position.posX = player.worldLeftTop.posX + player.size.posX;
+								penguinBullets[i].position.posY = player.worldLeftTop.posY + player.size.posY * 0.5f;
+								penguinBullets[i].isActive = true;
+								penguinShotCoolDown = kPenguinShotInterval;
+								break;
+							}
+						}
+					}
+
+					for (int i = 0; i < kMaxPenguinBullets; i++) {
+						if (!penguinBullets[i].isActive) continue;
+						penguinBullets[i].position.posX += 22.0f;
+
+						// シャチに当たったら吹き飛ばす
+						if (enemy.isActive && !isEnemyBlownAway &&
+							penguinBullets[i].position.posX >= enemy.position.posX &&
+							penguinBullets[i].position.posX <= enemy.position.posX + enemy.size.posX &&
+							penguinBullets[i].position.posY >= enemy.position.posY &&
+							penguinBullets[i].position.posY <= enemy.position.posY + enemy.size.posY) {
+							isEnemyBlownAway = true;
+							enemyBlowVelocityX = 15.0f;
+							enemyBlowVelocityY = -20.0f;
+							enemyRotationAngle = 0.0f;
+							penguinBullets[i].isActive = false;
+							continue;
+						}
+
+						// オオカミに当たったら弾を消す（ボスの動作は変更しない）
+						float bossWorldX = kBossScreenX + scrollValue;
+						if (bossOokami.isActive &&
+							penguinBullets[i].position.posX >= bossWorldX &&
+							penguinBullets[i].position.posX <= bossWorldX + bossOokami.size.posX &&
+							penguinBullets[i].position.posY >= bossOokami.position.posY &&
+							penguinBullets[i].position.posY <= bossOokami.position.posY + bossOokami.size.posY) {
+							if (bossHP > 0) {
+								int damage = (stage3PowerBoostTimer > 0) ? 2 : 1;
+								bossHP -= damage; // 強化中はダメージ2、それ以外は1
+								if (bossHP < 0) bossHP = 0;
+							}
+							penguinBullets[i].isActive = false;
+							if (bossHP <= 0) {
+								bossOokami.isActive = false;
+								bossSpawnTimer = 0;
+								bossHPBarSpinTimer = 0;
+							}
+							continue;
+						}
+
+						if (penguinBullets[i].position.posX - scrollValue > 1280.0f) {
+							penguinBullets[i].isActive = false;
+						}
+					}
+				}
+
 				//==========================================
 				// 無敵時間の処理
 				//==========================================
@@ -1539,11 +1893,205 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 
 				//==========================================
+				// ボスオオカミのアニメーション更新（main1より追加）
+				//==========================================
+				if (bossOokami.isActive) {
+					// オオカミは攻撃の合間に、たまに高めにジャンプする
+					// 一度ジャンプを始めたら、攻撃状態が変わっても着地まで動かす
+					if (bossIsJumping) {
+						bossJumpVelocityY += kBossJumpGravity;
+						bossOokami.position.posY += bossJumpVelocityY;
+						if (bossOokami.position.posY >= kBossGroundY) {
+							bossOokami.position.posY = kBossGroundY;
+							bossJumpVelocityY = 0.0f;
+							bossIsJumping = false;
+							bossJumpCooldown = 180 + (rand() % 180); // 次のジャンプまで約3〜6秒
+						}
+					}
+					else if (jannpuLandingTimer >= kMaxLandingTime && !isPunching && !isWaveActive) {
+						if (bossJumpCooldown > 0) {
+							bossJumpCooldown--;
+						}
+						else {
+							bossIsJumping = true;
+							bossJumpVelocityY = -kBossJumpPower;
+						}
+					}
+
+					// 着地演出完了後にパンチ攻撃のランダム発生制御を行う
+					if (jannpuLandingTimer >= kMaxLandingTime && !bossIsJumping) {
+						if (!isPunching) {
+							punchCoolTimer++;
+							if (punchCoolTimer >= punchInterval) {
+								isPunching = true;
+								punchFrame = 0;
+								punchAnimTimer = 0;
+								punchCoolTimer = 0;
+								punchInterval = 120 + (rand() % 180); // 次回間隔を再生成（2秒〜5秒）
+							}
+						}
+						else {
+							// パンチ（10コマ連番）のアニメーション更新
+							punchAnimTimer++;
+							if (punchAnimTimer >= 4) { // 4フレームごとに1コマ進む
+								punchAnimTimer = 0;
+								punchFrame++;
+								if (punchFrame == 9) {
+									// pannti.png の10枚目で効果音を再生
+									if (panntiSound != -1) {
+										Novice::PlayAudio(panntiSound, false, 1.0f);
+									}
+									// pannti.png の10枚目で地面を殴った衝撃（軽量な砂煙＋火花）
+									SpawnGroundSlam(
+										kBossScreenX + scrollValue,
+										bossOokami.position.posY + 205.0f
+									);
+								}
+
+								if (punchFrame >= 10) {
+									punchFrame = 0;
+									isPunching = false; // 10コマ再生で終了
+
+									// ★パンチが10コマ目に到達した瞬間に波動攻撃（手の生成）を開始★
+									isWaveActive = true;
+									waveTimer = 0;
+									waveSpawnCount = 0;
+									waveEraseTimer = 0;
+									waveEraseIndex = 0;
+									for (int i = 0; i < kMaxWaveHands; i++) {
+										waveHands[i].isActive = false;
+										waveHands[i].isFadingOut = false;
+										waveHands[i].lifeTimer = 0;
+									}
+								}
+							}
+						}
+					}
+
+					bossOokami.animTimer++;
+					if (bossOokami.animTimer >= 8) { // 8フレームごとにコマ送り
+						bossOokami.animTimer = 0;
+						bossOokami.currentFrame = (bossOokami.currentFrame + 1) % bossOokami.frameCount;
+					}
+				}
+
+				//==========================================
+				// 波動（手の攻撃：te.png 1枚絵）の更新処理
+				// 常に画面に最大4個表示し、新しい手が生成されたら後ろから順に消していく
+				//==========================================
+				if (isWaveActive && !isGameClear) {
+					waveTimer++;
+
+					// --- 生成処理（オオカミ側から左へ順に生成） ---
+					if (waveSpawnCount < kMaxWaveCount) {
+						if (waveTimer % 8 == 0) {
+							// 画面に既に4個表示されている場合、一番古い（最も後ろ）手を消去する
+							if (waveSpawnCount - waveEraseIndex >= 4) {
+								waveHands[waveEraseIndex].isActive = false;
+								waveEraseIndex++;
+							}
+
+							// 次の手を生成
+							waveHands[waveSpawnCount].isActive = true;
+							waveHands[waveSpawnCount].isFadingOut = false;
+							waveHands[waveSpawnCount].lifeTimer = 0;
+
+							// 間隔220.0fで手（te）を右から左へ順次生成（手と手の間隔をもう少し狭める）
+							waveHands[waveSpawnCount].screenX = (kBossScreenX - kBossOffsetX) - (waveSpawnCount * 220.0f) - 200.0f;
+							waveHands[waveSpawnCount].screenY = bossOokami.position.posY - kBossOffsetY;
+							waveSpawnCount++;
+						}
+					}
+					else {
+						// 全ての生成が完了したら、残っている手を順次消去する
+						waveEraseTimer++;
+						if (waveEraseTimer % 8 == 0) {
+							if (waveEraseIndex < waveSpawnCount) {
+								waveHands[waveEraseIndex].isActive = false;
+								waveEraseIndex++;
+							}
+							waveEraseTimer = 0;
+						}
+					}
+
+					// 全ての手の生成と消去が終了したら初期化
+					if (waveSpawnCount >= kMaxWaveCount && waveEraseIndex >= waveSpawnCount) {
+						isWaveActive = false;
+						waveTimer = 0;
+						waveSpawnCount = 0;
+						waveEraseTimer = 0;
+						waveEraseIndex = 0;
+					}
+				}
+
+				// 各手（te.png 1枚絵）のライフ時間更新・画面左端消滅・当たり判定
+				for (int i = 0; i < kMaxWaveHands; i++) {
+					if (waveHands[i].isActive) {
+						waveHands[i].lifeTimer++;
+						if (waveHands[i].lifeTimer == 6 && teSound != -1) {
+							Novice::PlayAudio(teSound, false, 1.0f);
+						}
+						waveHands[i].screenX -= 10.0f; // 波動が左へ進む（さらに速度アップ）
+
+						// 画面左端（X <= -256.0f）を完全に通過した場合も消去
+						if (waveHands[i].screenX + 256.0f <= 0.0f) {
+							waveHands[i].isActive = false;
+						}
+
+						// プレイヤーとの当たり判定
+						if (waveHands[i].isActive && !isInvincible && !isTransitioningToBonus && !isGameClear) {
+							float playerScreenLeft = player.worldLeftTop.posX - scrollValue;
+							float playerScreenRight = playerScreenLeft + player.size.posX;
+							float playerTop = player.worldLeftTop.posY;
+							float playerBottom = player.worldLeftTop.posY + player.size.posY;
+
+							float handLeft = waveHands[i].screenX + 40.0f;
+							float handRight = handLeft + 160.0f;
+							float handTop = waveHands[i].screenY + 75.0f; // 当たり判定を少し下へ
+							float handBottom = handTop + 160.0f;
+
+							if (playerScreenLeft < handRight &&
+								playerScreenRight > handLeft &&
+								playerTop < handBottom &&
+								playerBottom > handTop) {
+
+								if (hitSound != -1) {
+									Novice::PlayAudio(hitSound, false, 0.8f);
+								}
+
+								if (playerLife > 0) {
+									playerLife--;
+								}
+
+								if (playerLife <= 0) {
+									scene = GameOver;
+									gameOverTimer = 0;
+
+									if (stagePlayHandle != -1) {
+										Novice::StopAudio(stagePlayHandle);
+										stagePlayHandle = -1;
+									}
+
+									if (gameOverSound != -1) {
+										Novice::PlayAudio(gameOverSound, false, 0.8f);
+									}
+								}
+
+								hasTakenDamage = true;
+								isInvincible = true;
+								invincibleTimer = 0;
+							}
+						}
+					}
+				}
+
+				//==========================================
 				// スクロール計算（敵の更新で使うため先行計算）
 				//==========================================
 				scrollValue =
 					player.worldLeftTop.posX +
-					player.size.posX - scrollStartPositionX;
+					player.size.posX -
+					(selectedStage == 2 ? kStage3ScrollStartPositionX : scrollStartPositionX);
 
 				if (scrollValue < 0.0f) {
 					scrollValue = 0.0f;
@@ -1554,24 +2102,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				//==========================================
 				shakeOffsetX = 0.0f;
 				shakeOffsetY = 0.0f;
-				if (octopus.shakeTimer > 0) {
-					octopus.shakeTimer--;
-					shakeOffsetX = static_cast<float>((rand() % 21) - 10);
-					shakeOffsetY = static_cast<float>((rand() % 21) - 10);
-				}
+				// main1のボス演出用シェイクを加算
+				shakeOffsetX += shakeX;
+				shakeOffsetY += shakeY;
 
 				//==========================================
 				// シャチ（敵）の更新処理
 				//==========================================
-				if (enemy.isActive && !isGameClear) {
+				if (isEnemyBlownAway) {
+					// 吹き飛び状態の更新処理
+					enemy.position.posX += enemyBlowVelocityX;
+					enemy.position.posY += enemyBlowVelocityY;
+					enemyBlowVelocityY += kGravity; // 重力で落下
+					enemyRotationAngle += 0.2f;    // 回転
+
+					// 画面外へ消えたら完全に無効化
+					if (enemy.position.posY > 1000.0f || enemy.position.posX - scrollValue > 2000.0f) {
+						enemy.isActive = false;
+						isEnemyBlownAway = false;
+					}
+				}
+				else if (enemy.isActive && !isGameClear) {
 					// 右から左へ移動
 					enemy.position.posX -= enemy.speed;
 
 					// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
 					if (enemy.position.posX + enemy.size.posX < scrollValue) {
-						enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-						enemy.position.posY = 480.0f; // シャチのY位置をさらに下に調整
-						enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付きにランダム変更
+						// オオカミが着地済みの場合はリスポーンさせない（オオカミ以外の敵を出さない）
+						if (jannpuLandingTimer > 0 || (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f)) {
+							enemy.isActive = false;
+						}
+						else {
+							enemy.position.posX = scrollValue + 1280.0f + 200.0f;
+							enemy.position.posY = 480.0f; // シャチのY位置をさらに下に調整
+							enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付きにランダム変更
+						}
 					}
 
 					//==========================================
@@ -1663,21 +2228,51 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 
 				//==========================================
-				// タコ（ステージ3敵）の更新処理 (ボス演出)
+				// ボスオオカミとの当たり判定（main1より追加）
 				//==========================================
-				if (octopus.isActive && !isGameClear) {
-					// 画面右端から約400px左（画面右側寄り・見切れずしっかり入る位置）で停止
-					float stopX = scrollValue + 1280.0f - octopus.size.posX - 400.0f;
+				if (bossOokami.isActive && !isInvincible && !isTransitioningToBonus && !isGameClear) {
+					// プレイヤーの画面座標
+					float playerScreenLeft = player.worldLeftTop.posX - scrollValue;
+					float playerScreenRight = playerScreenLeft + player.size.posX;
+					float playerTop = player.worldLeftTop.posY;
+					float playerBottom = player.worldLeftTop.posY + player.size.posY;
 
-					if (octopus.position.posX > stopX) {
-						octopus.position.posX -= octopus.speed;
-						if (octopus.position.posX < stopX) {
-							octopus.position.posX = stopX;
+					// ボスの画面固定座標
+					float bossLeft = kBossScreenX;
+					float bossRight = kBossScreenX + bossOokami.size.posX;
+					float bossTop = bossOokami.position.posY;
+					float bossBottom = bossOokami.position.posY + bossOokami.size.posY;
+
+					if (playerScreenLeft < bossRight &&
+						playerScreenRight > bossLeft &&
+						playerTop < bossBottom &&
+						playerBottom > bossTop) {
+
+						if (hitSound != -1) {
+							Novice::PlayAudio(hitSound, false, 0.8f);
 						}
-					}
-					else {
-						// 停止位置をキープしながら画面スクロールに追従
-						octopus.position.posX = stopX;
+
+						if (playerLife > 0) {
+							playerLife--;
+						}
+
+						if (playerLife <= 0) {
+							scene = GameOver;
+							gameOverTimer = 0;
+
+							if (stagePlayHandle != -1) {
+								Novice::StopAudio(stagePlayHandle);
+								stagePlayHandle = -1;
+							}
+
+							if (gameOverSound != -1) {
+								Novice::PlayAudio(gameOverSound, false, 0.8f);
+							}
+						}
+
+						hasTakenDamage = true;
+						isInvincible = true;
+						invincibleTimer = 0;
 					}
 				}
 
@@ -1782,7 +2377,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 
 				// ★通常ゲームでの「シャチの上のトランポリン」当たり判定 (hasTrampoline が true の時のみ判定)
-				if (enemy.isActive && enemy.hasTrampoline && !isGameClear) {
+				if (enemy.isActive && !isEnemyBlownAway && enemy.hasTrampoline && !isGameClear) {
 					float enemyTrampolineX = enemy.position.posX;
 					float enemyTrampolineY = enemy.position.posY - 60.0f + kTrampolineOffsetY;
 
@@ -1895,6 +2490,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 								coinCollectedByStage[set][y][x] = true;
 								coinCount++;
+								OnStage3CoinCollected();
 								StartCoinEffect(coinX, coinY);
 
 								// コインを取った場所から黄色い粒を発生
@@ -2183,33 +2779,229 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 				// シャチ（敵）の描画
 				if (enemy.isActive && enemyTexture != -1) {
-					Novice::DrawSprite(
-						static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
-						static_cast<int>(enemy.position.posY + shakeOffsetY),
-						enemyTexture,
-						1.0f, 1.0f, 0.0f, WHITE
-					);
+					float enemyScreenX = enemy.position.posX - scrollValue;
 
-					// ★hasTrampoline が true の時だけ真上にトランポリンを描画
-					if (enemy.hasTrampoline && trampoline != -1) {
-						Novice::DrawSprite(
-							static_cast<int>(enemy.position.posX - scrollValue + shakeOffsetX),
-							static_cast<int>(enemy.position.posY - 60.0f + shakeOffsetY),
-							trampoline,
-							1.0f, 1.0f, 0.0f, WHITE
+					if (isEnemyBlownAway) {
+						// 回転しながら吹き飛ぶ描画
+						Novice::DrawSpriteRect(
+							static_cast<int>(enemyScreenX + shakeOffsetX),
+							static_cast<int>(enemy.position.posY + shakeOffsetY),
+							0, 0, 256, 128, enemyTexture, 1.0f, 1.0f, enemyRotationAngle, WHITE
 						);
 					}
+					else {
+						Novice::DrawSprite(
+							static_cast<int>(enemyScreenX + shakeOffsetX),
+							static_cast<int>(enemy.position.posY + shakeOffsetY),
+							enemyTexture,
+							1.0f, 1.0f, 0.0f, WHITE
+						);
 
+						// ★hasTrampoline が true の時だけ真上にトランポリンを描画
+						if (enemy.hasTrampoline && trampoline != -1) {
+							Novice::DrawSprite(
+								static_cast<int>(enemyScreenX + shakeOffsetX),
+								static_cast<int>(enemy.position.posY - 60.0f + shakeOffsetY),
+								trampoline,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
+					}
 				}
 
-				// ★タコ（ステージ3用敵）の描画 (ボス演出)
-				if (octopus.isActive && octopusTexture != -1) {
-					Novice::DrawSprite(
-						static_cast<int>(octopus.position.posX - scrollValue + shakeOffsetX),
-						static_cast<int>(octopus.position.posY + shakeOffsetY),
-						octopusTexture,
-						1.0f, 1.0f, 0.0f, WHITE
+				// ★波動（手の攻撃エフェクト：te.png 1枚絵）の描画★
+				for (int i = 0; i < kMaxWaveHands; i++) {
+					if (waveHands[i].isActive && teTexture != -1) {
+						int drawX = static_cast<int>(waveHands[i].screenX + shakeOffsetX);
+						int drawY = static_cast<int>(waveHands[i].screenY + shakeOffsetY);
+
+
+						if (waveHands[i].lifeTimer >= 6) {
+							// 単体スプライト（1枚絵）として描画
+							Novice::DrawSprite(
+								drawX,
+								drawY,
+								teTexture,
+								1.0f, 1.0f,
+								0.0f, WHITE
+							);
+
+							// te.png の当たり判定を赤い線で表示（判定処理と同じ位置・大きさ）
+							Novice::DrawBox(
+								static_cast<int>(waveHands[i].screenX + 40.0f + shakeOffsetX),
+								static_cast<int>(waveHands[i].screenY + 75.0f + shakeOffsetY),
+								160, 160, 0.0f, 0xFF0000FF, kFillModeWireFrame
+							);
+
+						}
+					}
+				}
+
+				// ★ボスオオカミの描画（main1より追加）
+				if (bossOokami.isActive) {
+					float targetJannpuY = bossOokami.position.posY - kBossOffsetY - 120.0f;
+
+					// 1. 落下中 (jannpu.png を描画)
+					if (jannpuPosY < targetJannpuY) {
+						jannpuPosY += 10.0f; // 落下速度
+						if (jannpuPosY >= targetJannpuY) {
+							jannpuPosY = targetJannpuY;
+							// 狼が地面に着いた瞬間に着地音を再生
+							if (otiruSound != -1) {
+								Novice::PlayAudio(otiruSound, false, 1.0f);
+							}
+							// 通常BGMを停止してボスBGMをループ再生
+							if (stagePlayHandle != -1) {
+								Novice::StopAudio(stagePlayHandle);
+								stagePlayHandle = -1;
+							}
+							if (bossPlayHandle == -1 && bosusennHandle != -1) {
+								bossPlayHandle = Novice::PlayAudio(bosusennHandle, true, 1.0f);
+							}
+						}
+
+						if (jannpuTexture != -1) {
+							Novice::DrawSprite(
+								static_cast<int>(kBossScreenX - kBossOffsetX + shakeOffsetX),
+								static_cast<int>(jannpuPosY + shakeOffsetY),
+								jannpuTexture,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
+					}
+					// 2. 着地直後 (jannpu1.png を ookamiTexture と同じ座標・位置で描画)
+					else if (jannpuLandingTimer < kMaxLandingTime) {
+						jannpuLandingTimer++;
+
+						// 着地した最初の1フレーム目で画面内にいる敵（シャチ）を吹き飛ばす
+						if (jannpuLandingTimer == 1) {
+							// 着地した瞬間にHPバーの回転登場演出を開始
+							bossHPBarSpinTimer = 1;
+							// オオカミの着地と同時に、花火と豪華な粒子を一気に発生させる
+							float landingParticleX = kBossScreenX + scrollValue;
+							float landingParticleY = bossOokami.position.posY + 40.0f;
+							SpawnFireworks(landingParticleX, landingParticleY);
+							SpawnPerfectParticle(landingParticleX, landingParticleY);
+							// 着地時は大量の粒子が重なって負荷が上がらないよう、巨大な爆発は止める
+							// SpawnMegaBurst(landingParticleX, landingParticleY);
+
+							float enemyScreenX = enemy.position.posX - scrollValue;
+							if (enemy.isActive && enemyScreenX >= -enemy.size.posX && enemyScreenX <= 1280.0f) {
+								isEnemyBlownAway = true;
+								enemyBlowVelocityX = 15.0f;
+								enemyBlowVelocityY = -20.0f;
+								enemyRotationAngle = 0.0f;
+							}
+						}
+
+						// jannpu1.png が表示されている約2秒間（120フレーム）は常に揺れ続ける
+						shakeTimer = 1;
+						shakeAmount = 12.0f;
+
+						if (jannpu1Texture != -1) {
+							Novice::DrawSprite(
+								static_cast<int>(kBossScreenX - kBossOffsetX + shakeOffsetX),
+								static_cast<int>(bossOokami.position.posY - kBossOffsetY + shakeOffsetY),
+								jannpu1Texture,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
+					}
+					// 3. 着地演出完了後 (通常モーション または パンチ攻撃を描画)
+					else {
+						if (bossIsJumping && jannpuTexture != -1) {
+							// ジャンプ中はジャンプ用の狼画像を表示
+							Novice::DrawSprite(
+								static_cast<int>(kBossScreenX - kBossOffsetX + shakeOffsetX),
+								static_cast<int>(bossOokami.position.posY - kBossOffsetY + shakeOffsetY),
+								jannpuTexture,
+								1.0f, 1.0f, 0.0f, WHITE
+							);
+						}
+						else if (isPunching && panntiTexture != -1) {
+							// 10枚の横長連番画像 (1コマあたり256px)
+							Novice::DrawSpriteRect(
+								static_cast<int>(kBossScreenX - kBossOffsetX + shakeOffsetX),
+								static_cast<int>(bossOokami.position.posY - kBossOffsetY + shakeOffsetY),
+								punchFrame * 256,
+								0,
+								256, 256,
+								panntiTexture,
+								0.1f, 1.0f, 0.0f, WHITE
+							);
+						}
+						else if (ookamiTexture != -1) {
+							Novice::DrawSpriteRect(
+								static_cast<int>(kBossScreenX - kBossOffsetX + shakeOffsetX),
+								static_cast<int>(bossOokami.position.posY - kBossOffsetY + shakeOffsetY),
+								bossOokami.currentFrame * 256,
+								0,
+								256, 256,
+								ookamiTexture,
+								0.2f, 1.0f, 0.0f, WHITE
+							);
+						}
+					}
+				}
+
+				// 狼の胴体（当たり判定）だけを赤い四角で表示
+				if (bossOokami.isActive) {
+					Novice::DrawBox(
+						static_cast<int>(kBossScreenX),
+						static_cast<int>(bossOokami.position.posY),
+						static_cast<int>(bossOokami.size.posX),
+						static_cast<int>(bossOokami.size.posY),
+						0.0f, 0xFF0000FF, kFillModeWireFrame
 					);
+				}
+
+				// ボスHPバー：ボスの位置から何回も回転しながら画面上部へ飛んで登場
+				if (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f) {
+					if (bossHPBarSpinTimer > 0 && bossHPBarSpinTimer < kBossHPBarSpinDuration) {
+						bossHPBarSpinTimer++;
+					}
+					float progress = static_cast<float>(bossHPBarSpinTimer) / static_cast<float>(kBossHPBarSpinDuration);
+					if (progress > 1.0f) progress = 1.0f;
+					// 約4回転してから止まる
+					float barAngle = (1.0f - progress) * 25.1327412f;
+					float barWidth = 500.0f * progress;
+					if (barWidth < 1.0f) barWidth = 1.0f;
+					// ボスの中心から画面上部中央へ移動させる
+					float startCenterX = kBossScreenX - kBossOffsetX + kBossDrawSize * 0.5f;
+					float startCenterY = bossOokami.position.posY - kBossOffsetY + kBossDrawSize * 0.5f;
+					float centerX = startCenterX + (640.0f - startCenterX) * progress;
+					float centerY = startCenterY + (55.0f - startCenterY) * progress;
+					// HPバー全体の中心（centerX, centerY）を回転の中心にする。
+					// DrawBoxを個別に回すとパーツごとに回転の中心がずれるため、
+					// 四隅を同じ中心のまわりで回転させて三角形で描画する。
+					auto drawHPRect = [&](float localX, float localY, float rectWidth, float rectHeight, unsigned int color) {
+						float cosAngle = cosf(barAngle);
+						float sinAngle = sinf(barAngle);
+						float x1 = localX, y1 = localY;
+						float x2 = localX + rectWidth, y2 = localY;
+						float x3 = localX + rectWidth, y3 = localY + rectHeight;
+						float x4 = localX, y4 = localY + rectHeight;
+						auto rotateX = [&](float x, float y) { return centerX + x * cosAngle - y * sinAngle; };
+						auto rotateY = [&](float x, float y) { return centerY + x * sinAngle + y * cosAngle; };
+						int ix1 = static_cast<int>(rotateX(x1, y1)), iy1 = static_cast<int>(rotateY(x1, y1));
+						int ix2 = static_cast<int>(rotateX(x2, y2)), iy2 = static_cast<int>(rotateY(x2, y2));
+						int ix3 = static_cast<int>(rotateX(x3, y3)), iy3 = static_cast<int>(rotateY(x3, y3));
+						int ix4 = static_cast<int>(rotateX(x4, y4)), iy4 = static_cast<int>(rotateY(x4, y4));
+						Novice::DrawTriangle(ix1, iy1, ix2, iy2, ix3, iy3, color, kFillModeSolid);
+						Novice::DrawTriangle(ix1, iy1, ix3, iy3, ix4, iy4, color, kFillModeSolid);
+						};
+					drawHPRect(-barWidth * 0.5f, -13.0f, barWidth, 26.0f, 0x111111EE);
+					if (barWidth > 8.0f) {
+						drawHPRect(-barWidth * 0.5f + 4.0f, -9.0f, barWidth - 8.0f, 18.0f, 0x555555FF);
+						int hpWidth = static_cast<int>((barWidth - 8.0f) * static_cast<float>(bossHP) / static_cast<float>(kBossMaxHP));
+						if (hpWidth > 0) {
+							unsigned int hpColor = bossHP > 25 ? 0x45E05AFF : 0xFF4545FF;
+							drawHPRect(-barWidth * 0.5f + 4.0f, -9.0f, static_cast<float>(hpWidth), 18.0f, hpColor);
+						}
+					}
+					if (bossHPBarSpinTimer >= kBossHPBarSpinDuration) {
+						Novice::ScreenPrintf(520, 15, "BOSS HP %d / %d", bossHP, kBossMaxHP);
+					}
 				}
 
 				// ★プレイヤー描画（無敵時間中の点滅処理を考慮）
@@ -2245,6 +3037,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							playerTexture,
 							1.0f, 1.0f, 0.0f, WHITE
 						);
+					}
+				}
+
+				// ステージ3の弾とコイン20枚チャージメーター
+				if (selectedStage == 2) {
+					for (int i = 0; i < kMaxPenguinBullets; i++) {
+						if (penguinBullets[i].isActive && tamaTexture != -1) {
+							Novice::DrawSprite(
+								static_cast<int>(penguinBullets[i].position.posX - scrollValue + shakeOffsetX),
+								static_cast<int>(penguinBullets[i].position.posY + shakeOffsetY),
+								tamaTexture, 0.65f, 0.65f, 0.0f, WHITE);
+						}
+					}
+
+					// メーター背景とゲージ（最大20枚）
+					Novice::DrawBox(20, 88, 244, 24, 0.0f, 0x101820FF, kFillModeSolid);
+					Novice::DrawBox(23, 91, 238, 18, 0.0f, 0x555555FF, kFillModeSolid);
+					int meterWidth = stage3ChargeCoinCount * 238 / kCoinsToUnlockShot;
+					if (meterWidth > 0) {
+						unsigned int meterColor = stage3ChargeCoinCount >= kCoinsToUnlockShot ? 0x35D9FFFF : 0xFFD447FF;
+						Novice::DrawBox(23, 91, meterWidth, 18, 0.0f, meterColor, kFillModeSolid);
+					}
+					Novice::ScreenPrintf(20, 116, "SHOT %d / %d", stage3ChargeCoinCount, kCoinsToUnlockShot);
+					if (stage3PowerBoostTimer > 0) {
+						Novice::ScreenPrintf(20, 140, "POWER x2! %.1f sec", stage3PowerBoostTimer / 60.0f);
+					}
+					if (stage3ChargeCoinCount >= kCoinsToUnlockShot) {
+						Novice::ScreenPrintf(20, 136, "AUTO SHOT!");
 					}
 				}
 
@@ -2503,6 +3323,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								bonusCoinCollected[loop][y][x] = true;
 
 								coinCount++;
+								OnStage3CoinCollected();
 								StartCoinEffect(coinX, coinY);
 
 								for (int i = 0; i < kMaxParticles; i++)
@@ -2683,7 +3504,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				//==========================================
 				scrollValue =
 					player.worldLeftTop.posX +
-					player.size.posX - scrollStartPositionX;
+					player.size.posX -
+					(selectedStage == 2 ? kStage3ScrollStartPositionX : scrollStartPositionX);
 
 				if (scrollValue < 0.0f) {
 					scrollValue = 0.0f;
@@ -3213,7 +4035,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					isSpeedBoostActive = false;
 					hasSpeedBoostTriggered = false;
 					speedBoostTimer = 0;
-					octopus.isActive = false;
+					bossOokami.isActive = false;
+					bossSpawnTimer = 0;
+					isEnemyBlownAway = false;
+					isPunching = false;
+					punchFrame = 0;
+					punchAnimTimer = 0;
+					punchCoolTimer = 0;
+					isWaveActive = false;
+					waveTimer = 0;
+					waveSpawnCount = 0;
+					waveEraseTimer = 0;
+					waveEraseIndex = 0;
+					for (int i = 0; i < kMaxWaveHands; i++) {
+						waveHands[i].isActive = false;
+						waveHands[i].isFadingOut = false;
+						waveHands[i].lifeTimer = 0;
+					}
 
 					memset(starConditions, 0, sizeof(starConditions));
 					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
@@ -3266,7 +4104,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						maxPlayerLife = 3;
 						enemy.speed = 8.0f;
 						enemy.isActive = true;
-						octopus.isActive = false;
 					}
 					else if (selectedStage == 1) { // STAGE 2
 						kMoveSpeed = 14.0f;
@@ -3274,17 +4111,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						maxPlayerLife = 3;
 						enemy.speed = 10.0f;
 						enemy.isActive = true;
-						octopus.isActive = false;
 					}
 					else if (selectedStage == 2) { // STAGE 3
 						kMoveSpeed = 12.0f;
-						playerLife = 1;
-						maxPlayerLife = 1;
+						playerLife = 3;
+						maxPlayerLife = 3;
 						enemy.speed = 12.0f;
 						enemy.isActive = false;
-						octopus.isActive = true;
-						octopus.position = { 1280.0f + 300.0f, 250.0f };
-						octopus.shakeTimer = 30;
 					}
 
 					// プレイヤー・ゲーム変数のリセット
@@ -3328,6 +4161,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (firePlayHandle != -1) { Novice::StopAudio(firePlayHandle); firePlayHandle = -1; }
 					if (bonusPlayHandle != -1) { Novice::StopAudio(bonusPlayHandle); bonusPlayHandle = -1; }
 					if (stagePlayHandle != -1) { Novice::StopAudio(stagePlayHandle); stagePlayHandle = -1; }
+
+					// ステージ3（オオカミ戦）関連の状態リセット（Rキーリスタート用）
+					bossOokami.isActive = false;
+					bossSpawnTimer = 0;
+					bossHP = kBossMaxHP;
+					bossHPBarSpinTimer = 0;
+					bossIsJumping = false;
+					bossJumpVelocityY = 0.0f;
+					isEnemyBlownAway = false;
+					isPunching = false;
+					punchFrame = 0;
+					punchAnimTimer = 0;
+					punchCoolTimer = 0;
+					isWaveActive = false;
+					waveTimer = 0;
+					waveSpawnCount = 0;
+					waveEraseTimer = 0;
+					waveEraseIndex = 0;
+					for (int i = 0; i < kMaxWaveHands; i++) {
+						waveHands[i].isActive = false;
+						waveHands[i].isFadingOut = false;
+						waveHands[i].lifeTimer = 0;
+					}
+					jannpuPosY = -200.0f;
+					jannpuLandingTimer = 0;
+					shakeTimer = 0;
+					stage3ChargeCoinCount = 0;
+					stage3CoinsTowardPowerBoost = 0;
+					stage3PowerBoostTimer = 0;
+					penguinShotCoolDown = 0;
+					for (int i = 0; i < kMaxPenguinBullets; i++) {
+						penguinBullets[i].isActive = false;
+					}
+					if (bossPlayHandle != -1) { Novice::StopAudio(bossPlayHandle); bossPlayHandle = -1; }
 
 					// カウントダウン画面からリスタート
 					scene = CountDown;
@@ -3373,7 +4240,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					isSpeedBoostActive = false;
 					hasSpeedBoostTriggered = false;
 					speedBoostTimer = 0;
-					octopus.isActive = false;
+					bossOokami.isActive = false;
+					bossSpawnTimer = 0;
+					isEnemyBlownAway = false;
+					isPunching = false;
+					punchFrame = 0;
+					punchAnimTimer = 0;
+					punchCoolTimer = 0;
+					isWaveActive = false;
+					waveTimer = 0;
+					waveSpawnCount = 0;
+					waveEraseTimer = 0;
+					waveEraseIndex = 0;
+					for (int i = 0; i < kMaxWaveHands; i++) {
+						waveHands[i].isActive = false;
+						waveHands[i].isFadingOut = false;
+						waveHands[i].lifeTimer = 0;
+					}
 
 					memset(starConditions, 0, sizeof(starConditions));
 					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
@@ -3700,6 +4583,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 									coinCollectedByStage[set][y][x] = true;
 									coinCount++;
+									OnStage3CoinCollected();
 									StartCoinEffect(coinX, coinY);
 
 									// コインを取った場所から黄色い粒を発生
