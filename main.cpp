@@ -47,6 +47,23 @@ struct Particle
 	unsigned int color = 0xFFFF00FF; // 初期色：黄色
 };
 
+//==========================================
+// クマ（突進敵）の設定
+//==========================================
+struct Bear
+{
+	Vector2 position;
+	Vector2 size;
+	float speed;
+	bool isActive;
+	bool isWarning;        // 警告表示中フラグ
+	int timer;            // 20秒（1200フレーム）周期タイマー
+	int warningTimer;     // 警告アニメーション用タイマー
+
+	int frame;            // 現在のコマ番号
+	int animationTimer;   // コマ切り替え用タイマー
+};
+
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 {
 
@@ -161,6 +178,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int countDownTimer = 0;
 	// 3、2、1、START の表示時間
 	const int kCountDownTotalTime = 240;
+	//======================================
+	// クマ用変数
+	//======================================
+	Bear bear{};
+	bear.size = { 128.0f, 128.0f }; // 画面表示・当たり判定サイズ
+	bear.speed = 25.0f; // スピード
+	bear.position = { -200.0f, 480.0f }; // Y座標は480.0f（足元が地面位置）
+	bear.isActive = false;
+	bear.isWarning = false;
+	bear.timer = 0;
+	bear.warningTimer = 0;
+	bear.frame = 0;
+	bear.animationTimer = 0;
 	//==========================================
 	// 画像
 	//==========================================
@@ -178,6 +208,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 	int enemyTexture =
 		Novice::LoadTexture("./Resources/images/enemy.png");
+	//クマ
+	int polarBearTexture =
+		Novice::LoadTexture("./Resources/images/Polarbear.png");
+	//警告用画像
+	int caveatTexture =
+		Novice::LoadTexture("./Resources/images/caveat.png");
 	// バッテリー
 	int batteryTexture =
 		Novice::LoadTexture("./Resources/images/battery.png");
@@ -922,7 +958,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			}
 		}
 		};
+	// シャチの滑走・水しぶきパーティクルの発生処理
+	auto SpawnEnemySlideParticle = [&](float enemyX, float enemyY, float enemySpeed) {
+		int spawnCount = 1 + rand() % 2; // 一度に1〜2個生成
 
+		for (int count = 0; count < spawnCount; ++count) {
+			for (int i = 0; i < kMaxParticles; ++i) {
+				if (!particles[i].isActive) {
+					// シャチの体・足元付近（幅を持たせて散らす）
+					particles[i].position.posX = enemyX + 100.0f + (rand() % 80);
+					particles[i].position.posY = enemyY + 110.0f + (rand() % 10);
+
+					// 進行方向（左）の逆（右後ろ）〜上へ飛ぶベクトル
+					float speedX = (enemySpeed * (0.2f + (rand() % 40) / 50.0f)) + (rand() % 4);
+					float speedY = -(static_cast<float>(rand() % 40) / 10.0f) - 0.5f;
+
+					particles[i].velocity = { speedX, speedY };
+					particles[i].timer = 0;
+					particles[i].lifeTime = 15 + rand() % 10;
+					particles[i].radius = 2.0f + (rand() % 5);
+
+					// 水しぶき・氷のカラー（水色・白・青系）
+					int colorType = rand() % 3;
+					if (colorType == 0)      particles[i].color = 0xFFFFFFFF; // 白
+					else if (colorType == 1) particles[i].color = 0x33CCFFFF; // 鮮やかな水色
+					else                     particles[i].color = 0x0088FFFF; // 青
+
+					particles[i].isActive = true;
+					break;
+				}
+			}
+		}
+		};
 	//==========================================
 	// メインループ
 	//==========================================
@@ -2126,6 +2193,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					enemyBlowVelocityY += kGravity; // 重力で落下
 					enemyRotationAngle += 0.2f;    // 回転
 
+					// ★吹き飛び中も水しぶき・粒子を出す
+					SpawnEnemySlideParticle(enemy.position.posX, enemy.position.posY, enemy.speed);
+
 					// 画面外へ消えたら完全に無効化
 					if (enemy.position.posY > 1000.0f || enemy.position.posX - scrollValue > 2000.0f) {
 						enemy.isActive = false;
@@ -2136,16 +2206,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// 右から左へ移動
 					enemy.position.posX -= enemy.speed;
 
+					// ★追加：通常走行中、シャチの足元から水しぶき・粒子を発生させる
+					SpawnEnemySlideParticle(enemy.position.posX, enemy.position.posY, enemy.speed);
+
 					// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
 					if (enemy.position.posX + enemy.size.posX < scrollValue) {
-						// オオカミが着地済みの場合はリスポーンさせない（オオカミ以外の敵を出さない）
+						// オオカミが着地済みの場合はリスポーンさせない
 						if (jannpuLandingTimer > 0 || (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f)) {
 							enemy.isActive = false;
 						}
 						else {
 							enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-							enemy.position.posY = 480.0f; // シャチのY位置をさらに下に調整
-							enemy.hasTrampoline = (rand() % 2 == 0); // 50%の確率でトランポリン付きにランダム変更
+							enemy.position.posY = 480.0f;
+							enemy.hasTrampoline = (rand() % 2 == 0);
 						}
 					}
 
@@ -2174,7 +2247,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								Novice::PlayAudio(hitSound, false, 0.8f);
 							}
 
-							// ★追加：血のような赤いパーティクルの発生処理
+							//血のような赤いパーティクルの発生処理
 							float playerCenterX = player.worldLeftTop.posX + player.size.posX * 0.5f;
 							float playerCenterY = player.worldLeftTop.posY + player.size.posY * 0.5f;
 							int spawnedCount = 0;
@@ -2206,6 +2279,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								}
 							}
 
+							//エネミー（シャチ）側から弾ける闇/紫パーティクル
+							float enemyCenterX = enemy.position.posX + enemy.size.posX * 0.5f;
+							float enemyCenterY = enemy.position.posY + enemy.size.posY * 0.5f;
+							int enemyParticleCount = 0;
+
+							for (int p = 0; p < kMaxParticles; p++) {
+								if (!particles[p].isActive) {
+									float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+									float speed = 3.0f + static_cast<float>(rand()) / RAND_MAX * 6.0f;
+
+									particles[p].position = { enemyCenterX, enemyCenterY };
+									particles[p].velocity = { cosf(angle) * speed, sinf(angle) * speed };
+									particles[p].timer = 0;
+									particles[p].lifeTime = 20 + rand() % 10;
+									particles[p].radius = 4.0f + (rand() % 6);
+
+									// 紫・ダークブルー系のエフェクトカラー
+									if (rand() % 2 == 0) {
+										particles[p].color = 0x8A2BE2FF; // 紫 (BlueViolet)
+									}
+									else {
+										particles[p].color = 0x4B0082FF; // 濃い紫 (Indigo)
+									}
+
+									particles[p].isActive = true;
+									enemyParticleCount++;
+									if (enemyParticleCount >= 12) break; // 12個生成
+								}
+							}
+
 							// ライフを1つ減らす
 							if (playerLife > 0) {
 								playerLife--;
@@ -2233,6 +2336,122 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							// 無敵開始
 							isInvincible = true;
 							invincibleTimer = 0;
+						}
+					}
+				}
+
+				//==========================================
+				// クマ（突進敵）の更新処理
+				//==========================================
+				if (!isGameClear) {
+					bear.timer++;
+
+					// 20秒（1200フレーム）周期の開始タイマー（約18秒経過後に点滅警告開始）
+					if (bear.timer == 1080 && !bear.isActive && !bear.isWarning) {
+						bear.isWarning = true;
+						bear.warningTimer = 0;
+					}
+
+					// 警告演出処理（約2秒間 / 120フレーム）
+					if (bear.isWarning) {
+						bear.warningTimer++;
+
+						// 2秒（120フレーム）経過したら警告終了、突進スタート！
+						if (bear.warningTimer >= 120) {
+							bear.isWarning = false;
+							bear.isActive = true;
+							// プレイヤーのスクロール位置を考慮して画面左外側に出現
+							bear.position.posX = scrollValue - 200.0f;
+							bear.position.posY = 480.0f;
+						}
+					}
+
+					// 突進処理（左から右へ移動）
+					if (bear.isActive) {
+						bear.position.posX += bear.speed;
+
+						// 地面滑走パーティクル（水しぶき・雪煙）を散らす
+						SpawnEnemySlideParticle(bear.position.posX, bear.position.posY, bear.speed);
+
+						// ★追加: クマのアニメーション更新（ペンギンのジャンプと同じ仕組み）
+						const int kBearFrameCount = 4; // 画像のコマ数（枚数に合わせて変更してください）
+						bear.animationTimer++;
+						if (bear.animationTimer >= 6) { // 6フレームごとに次のコマへ
+							bear.animationTimer = 0;
+							bear.frame = (bear.frame + 1) % kBearFrameCount;
+						}
+
+						// 画面右外側に完全に脱出したらリセットして次の20秒カウントへ
+						if (bear.position.posX > scrollValue + 1280.0f + 200.0f) {
+							bear.isActive = false;
+							bear.timer = 0; // タイマーリセット
+							bear.frame = 0;
+							bear.animationTimer = 0;
+						}
+
+						//==========================================
+						// クマとの当たり判定（プレイヤー被弾）
+						//==========================================
+						if (!isInvincible && !isTransitioningToBonus) {
+							float playerLeft = player.worldLeftTop.posX;
+							float playerRight = player.worldLeftTop.posX + player.size.posX;
+							float playerTop = player.worldLeftTop.posY;
+							float playerBottom = player.worldLeftTop.posY + player.size.posY;
+
+							float bearLeft = bear.position.posX;
+							float bearRight = bear.position.posX + bear.size.posX;
+							float bearTop = bear.position.posY;
+							float bearBottom = bear.position.posY + bear.size.posY;
+
+							if (playerLeft < bearRight &&
+								playerRight > bearLeft &&
+								playerTop < bearBottom &&
+								playerBottom > bearTop) {
+
+								if (hitSound != -1) {
+									Novice::PlayAudio(hitSound, false, 0.8f);
+								}
+
+								// 被弾パーティクル
+								float playerCenterX = player.worldLeftTop.posX + player.size.posX * 0.5f;
+								float playerCenterY = player.worldLeftTop.posY + player.size.posY * 0.5f;
+								int spawnedCount = 0;
+
+								for (int p = 0; p < kMaxParticles; p++) {
+									if (!particles[p].isActive) {
+										float angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+										float speed = 4.0f + static_cast<float>(rand()) / RAND_MAX * 8.0f;
+										particles[p].position = { playerCenterX, playerCenterY };
+										particles[p].velocity = { cosf(angle) * speed, sinf(angle) * speed };
+										particles[p].timer = 0;
+										particles[p].lifeTime = 20 + rand() % 15;
+										particles[p].radius = 4.0f + static_cast<float>(rand()) / RAND_MAX * 5.0f;
+										particles[p].color = (rand() % 2 == 0) ? 0xCC0000FF : 0xFF2222FF;
+										particles[p].isActive = true;
+
+										spawnedCount++;
+										if (spawnedCount >= 16) break;
+									}
+								}
+
+								if (playerLife > 0) playerLife--;
+
+								if (playerLife <= 0) {
+									scene = GameOver;
+									gameOverTimer = 0;
+									if (stagePlayHandle != -1) {
+										Novice::StopAudio(stagePlayHandle);
+										stagePlayHandle = -1;
+									}
+									if (gameOverSound != -1) {
+										Novice::PlayAudio(gameOverSound, false, 0.8f);
+									}
+								}
+
+								hasTakenDamage = true;
+								isInvincible = true;
+								invincibleTimer = 0;
+							}
 						}
 					}
 				}
@@ -2818,6 +3037,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								1.0f, 1.0f, 0.0f, WHITE
 							);
 						}
+					}
+				}
+
+				// ★クマ（突進敵）の描画
+				if (bear.isActive && polarBearTexture != -1) {
+					Novice::DrawSpriteRect(
+						static_cast<int>(bear.position.posX - scrollValue + shakeOffsetX),
+						static_cast<int>(bear.position.posY + shakeOffsetY),
+						bear.frame * 256,   // srcX: 1コマの幅が256px
+						0,                  // srcY
+						256, 256,           // srcW, srcH: 1コマの元のサイズ
+						polarBearTexture,
+						0.125f, 0.5f,       // ★ scaleX を 0.125f に修正（横伸びを解消）
+						0.0f, WHITE
+					);
+				}
+
+				// ★警告マーク（画面左上に点滅表示）
+				if (bear.isWarning && caveatTexture != -1) {
+					// 30フレーム周期で2回点滅（60フレーム = 1秒間で1回点滅 × 2回 = 2秒間）
+					if ((bear.warningTimer / 30) % 2 == 0) {
+						Novice::DrawSprite(
+							50, 200, // 画面左側の見やすい位置に表示
+							caveatTexture,
+							1.0f, 1.0f, 0.0f, WHITE
+						);
 					}
 				}
 
@@ -4158,6 +4403,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					isSpeedBoostActive = false;
 					hasSpeedBoostTriggered = false;
 					speedBoostTimer = 0;
+
+					bear.isActive = false;
+					bear.isWarning = false;
+					bear.timer = 0;
+					bear.warningTimer = 0;
+					bear.frame = 0;          // ★追加
+					bear.animationTimer = 0; // ★追加
 
 					memset(starConditions, 0, sizeof(starConditions));
 					memcpy(coinMap, initialCoinMap, sizeof(coinMap));
