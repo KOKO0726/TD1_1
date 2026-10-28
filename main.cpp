@@ -1473,10 +1473,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					// ゲームシーンへ移動
 					scene = Game;
 
-					// ★追加: ゲーム開始時に約2秒間（120フレーム）の無敵時間を付与
-					isInvincible = true;
-					invincibleTimer = 0;
-
 					// ステージBGMを1回だけ再生
 					if (kStageHandle != -1) {
 						stagePlayHandle =
