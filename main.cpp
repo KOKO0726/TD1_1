@@ -241,6 +241,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	// 背景
 	int backgroundTexture =
 		Novice::LoadTexture("./Resources/images/iceBackGround.png");
+	// ボスに負けた時の画像
+	int gameOverWolfTexture =
+		Novice::LoadTexture("./Resources/images/gameOverWolf.png");
+	// ボスに勝った時の画像
+	int gameClearWolfTexture =
+		Novice::LoadTexture("./Resources/images/gameClearWolf.png");
 	// バットエンド背景
 	int gameOverTexture =
 		Novice::LoadTexture("./Resources/images/gameOver.png");
@@ -403,14 +409,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	const float kBossScreenX = 1000.0f; // 画面上に固定表示する画面X座標
 
 	BossOokami bossOokami{};
-	bossOokami.size = { 80.0f, 80.0f }; // 当たり判定はペンギンと同じサイズ
+	bossOokami.size = { 128.0f, 256.0f }; // 当たり判定はペンギンと同じサイズ
 	bossOokami.position = { kBossScreenX, kBossBaseGroundY + kPlayerOffsetY - 80.0f };
 	bossOokami.currentFrame = 0;
 	bossOokami.animTimer = 0;
 	bossOokami.isActive = false;
 
 	// オオカミがたまに少しだけジャンプするための設定
-	const float kBossGroundY = kBossBaseGroundY + kPlayerOffsetY - 80.0f;
+	const float kBossGroundY = kBossBaseGroundY + kPlayerOffsetY - 150.0f;
 	const float kBossJumpPower = 10.0f;
 	const float kBossJumpGravity = 0.32f;
 	float bossJumpVelocityY = 0.0f;
@@ -1948,10 +1954,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						SpawnSlideParticle(player.worldLeftTop.posX, player.worldLeftTop.posY, kMoveSpeed);
 					}
 
-					if (keys[DIK_A]) {
-						player.worldLeftTop.posX -= 30.0f; // デバッグ用
-					}
-
 					if (!waitSpaceRelease && preKeys[DIK_SPACE] == 0 &&
 						keys[DIK_SPACE] != 0 &&
 						jumpCount < kMaxJumpCount) {
@@ -3205,7 +3207,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				if (bossOokami.isActive) {
 					Novice::DrawBox(
 						static_cast<int>(kBossScreenX),
-						static_cast<int>(bossOokami.position.posY),
+						static_cast<int>(bossOokami.position.posY - kBossOffsetY), // ★ - kBossOffsetY を追加して上方向の判定位置を画像と統一
 						static_cast<int>(bossOokami.size.posX),
 						static_cast<int>(bossOokami.size.posY),
 						0.0f, 0xFF0000FF, kFillModeWireFrame
@@ -4150,6 +4152,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
 					Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
 				}
+
+				// ★ ステージ3クリア時（ボス撃破時）に「勝った時のオオカミ画像」を表示
+				if (selectedStage == 2 && gameClearWolfTexture != -1) {
+					Novice::DrawSprite(
+						400, 180,               // 表示位置（画面中央付近）
+						gameClearWolfTexture,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
+				}
 				DrawCoinEffects();
 				DrawCoinCount();
 
@@ -4342,13 +4353,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// 背景描画（gameOverTexture が読み込まれていれば表示）
+				// 1. まず背景画像を描画（または黒背景）
 				if (gameOverTexture != -1) {
 					Novice::DrawSprite(0, 0, gameOverTexture, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 				else {
 					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
 					Novice::ScreenPrintf(560, 360, "GAME OVER");
+				}
+
+				// 2. 背景の上に重なるように負けたオオカミの画像を描画（ステージ3限定）
+				if (selectedStage == 2 && gameOverWolfTexture != -1) {
+					// 画像のサイズや位置がズレないよう画面中央付近に配置
+					Novice::DrawSprite(
+						440, 200,               // 表示位置 (X, Y) を画面中央に微調整
+						gameOverWolfTexture,
+						1.0f, 1.0f, 0.0f, WHITE
+					);
 				}
 
 				// ==========================================
@@ -4625,10 +4646,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 					// 自動前進
 					player.worldLeftTop.posX += kMoveSpeed;
-
-					if (keys[DIK_A]) {
-						player.worldLeftTop.posX -= 30.0f;
-					}
 
 					//==========================================
 					// スクロール計算（敵の更新で使うため先行計算）
