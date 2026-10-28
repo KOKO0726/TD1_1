@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
+#include <windows.h> // Sleep（スローモーション演出用）
 
 const char kWindowTitle[] = "1166_ペンギンのはらすべり ";
 
@@ -440,6 +441,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int bossSpawnTimer = 0;
 	bool bossDefeated = false; // ボスを倒したら再出現させないためのフラグ
 
+	// ボス撃破時のスローモーション演出用（1フレームごとに待ちを入れて全体をゆっくりにする）
+	int slowMotionTimer = 0;
+	const int kSlowMotionDuration = 60;  // スロー演出のフレーム数
+	const int kSlowMotionSleepMs = 33;   // 1フレームに足す待ち時間(ms)。約1/3の速さになる
+	bool bossClearPending = false;       // 狼撃破後、演出が終わるのを待ってクリア画面へ移るフラグ
+
 	// ボスHP（初期HPは50）と、着地時にHPバーを回転表示する演出
 	int bossHP = 50;
 	const int kBossMaxHP = 50;
@@ -574,6 +581,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	int selectedStage = 0; // 0: STAGE 1, 1: STAGE 2, 2: STAGE 3
 
+	// シャチ出現時のY座標を決める。
+	// ステージ1・2：トランポリン付きは地面（下）、トランポリン無しはY座標ランダム。ステージ3は従来どおり地面。
+	auto SetEnemySpawnHeight = [&]() {
+		const float kEnemyGroundY = 480.0f;
+		const int kEnemyRandomMinY = 150;
+		if (selectedStage == 2 || enemy.hasTrampoline) {
+			enemy.position.posY = kEnemyGroundY;
+		}
+		else {
+			enemy.position.posY = static_cast<float>(kEnemyRandomMinY + rand() % (static_cast<int>(kEnemyGroundY) - kEnemyRandomMinY + 1));
+		}
+		};
+
 	//==========================================
 	// トランポリン
 	//==========================================
@@ -650,8 +670,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	ClearRainCoin clearRainCoins[kMaxClearRainCoins]{};
 	const int kClearCoinColumnCount = 60;
 	const int kClearCoinMaxStackHeight = 6;
-	const float kClearCoinDrawScale = 0.25f;
-	const float kClearCoinDrawSize = 16.0f; // coin.png（64x64）の0.25倍
+	const float kClearCoinDrawScale = 0.4f; // 大きさ調整用（0.25で16px、0.5で32px）
+	const float kClearCoinDrawSize = 25.6f; // 64px × kClearCoinDrawScale
 	const float kClearCoinPileStartX = 40.0f;
 	const float kClearCoinColumnSpacing = 20.0f;
 	const float kClearCoinPileBaseY = 712.0f;
@@ -659,7 +679,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	int clearCoinPileHeights[kClearCoinColumnCount]{};
 	int clearCoinRainTarget = 0;
 	int clearCoinRainSpawned = 0;
-	const int kClearCoinRainStartFrame = 110;
+	const int kClearCoinRainStartFrame = 100; // 星4つ目の演出（96フレーム）が終わった直後
 	const int kClearCoinRainEndFrame = 370;
 	const int kClearCoinRainMaxDrops = 1000;
 
@@ -1050,6 +1070,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 			shakeY = 0.0f;
 		}
 
+		//==========================================
+		// スローモーション更新（ボス撃破演出）
+		//==========================================
+		if (slowMotionTimer > 0) {
+			slowMotionTimer--;
+			Sleep(kSlowMotionSleepMs);
+		}
+
 		// ESCでポーズ。上下で選択、SPACEで決定
 		if (scene == Game || scene == BonusStage || scene == tutorial) {
 			if (preKeys[DIK_ESCAPE] == 0 && keys[DIK_ESCAPE] != 0) {
@@ -1115,6 +1143,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						bossOokami.isActive = false;
 						bossSpawnTimer = 0;
 						bossDefeated = false;
+						slowMotionTimer = 0;
 						isEnemyBlownAway = false;
 						isPunching = false;
 						punchFrame = 0;
@@ -1344,6 +1373,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							bossOokami.isActive = false;
 							bossSpawnTimer = 0;
 							bossDefeated = false;
+							slowMotionTimer = 0;
 							isEnemyBlownAway = false;
 							isPunching = false;
 							punchFrame = 0;
@@ -1665,6 +1695,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						bossOokami.isActive = false;
 						bossSpawnTimer = 0;
 						bossDefeated = false;
+						slowMotionTimer = 0;
 						isEnemyBlownAway = false;
 						enemyBlowVelocityX = 15.0f;
 						enemyBlowVelocityY = -20.0f;
@@ -1703,7 +1734,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					player.worldLeftTop = { 10.0f, 500.0f };
 					enemy.position = { 1280.0f + 200.0f, 480.0f }; // シャチのY位置をさらに下に調整
 					enemy.isActive = true; // ステージ3でもシャチを出す（オオカミ登場まで）
-					enemy.hasTrampoline = (rand() % 2 == 0);
+					enemy.hasTrampoline = (selectedStage != 2 && rand() % 2 == 0); // ステージ3は常にトランポリン無し
+					SetEnemySpawnHeight();
 
 				}
 
@@ -1851,6 +1883,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						  //==========================================
 
 			case Game: {
+				// 狼撃破の演出（スローモーション）が終わったらクリア画面へ
+				if (bossClearPending && bossDefeated && slowMotionTimer <= 0) {
+					bossClearPending = false;
+					scene = Clear;
+					clearTimer = 0;
+					break;
+				}
+
 				//==========================================
 				// 現在のステージセットを更新
 				//==========================================
@@ -1938,6 +1978,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							if (bossHP <= 0) {
 								bossOokami.isActive = false;
 								bossDefeated = true; // 倒したので以後は出現させない
+								slowMotionTimer = kSlowMotionDuration; // スローモーション開始
+								enemy.isActive = false;      // 狼が死んだらシャチも止める（消える）
+								isEnemyBlownAway = false;
+								// 狼が倒れたときのパーティクル演出（重くならないよう花火2発だけ）
+								{
+									float deathX = kBossScreenX + bossOokami.size.posX * 0.5f + scrollValue;
+									float deathY = bossOokami.position.posY + bossOokami.size.posY * 0.5f;
+									SpawnFireworks(deathX, deathY);                 // 花火（60粒）
+									SpawnFireworks(deathX, deathY - 80.0f);          // 少し上にもう1発（60粒）
+									shakeTimer = 30;                                // 倒れた衝撃で画面を揺らす
+									shakeAmount = 10.0f;
+								}
 								isPunching = false;
 								punchFrame = 0;
 								punchAnimTimer = 0;
@@ -1947,6 +1999,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								}
 								bossSpawnTimer = 0;
 								bossHPBarSpinTimer = 0;
+
+								// ★ボス撃破 → クリア画面へ移行（gameClearWolf.png を表示）
+								for (int b = 0; b < kMaxPenguinBullets; b++) {
+									penguinBullets[b].isActive = false;
+								}
+								if (bossPlayHandle != -1) {
+									Novice::StopAudio(bossPlayHandle);
+									bossPlayHandle = -1;
+								}
+								if (stagePlayHandle != -1) {
+									Novice::StopAudio(stagePlayHandle);
+									stagePlayHandle = -1;
+								}
+								// ステージ3は星なし（画像1枚のみ）
+								starCount = 0;
+								memset(starConditions, 0, sizeof(starConditions));
+								// スローモーション＆パーティクル演出が終わってからクリア画面へ移る
+								bossClearPending = true;
+								isInvincible = true;   // 演出中に被弾してゲームオーバーにならないようにする
+								invincibleTimer = 0;
+								break; // 弾ループを抜ける
 							}
 							continue;
 						}
@@ -2234,21 +2307,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				}
 				else if (enemy.isActive && !isGameClear) {
 					// 右から左へ移動
-					enemy.position.posX -= enemy.speed;
+					// クマの警告中・突進中は、画面右外にいるシャチを止めて出さない
+					if ((bear.isWarning || bear.isActive) && enemy.position.posX - scrollValue >= 1280.0f) {
+						enemy.position.posX = scrollValue + 1280.0f + 200.0f;
+					}
+					else {
+						enemy.position.posX -= enemy.speed;
+					}
 
 					// ★追加：通常走行中、シャチの足元から水しぶき・粒子を発生させる
-					SpawnEnemySlideParticle(enemy.position.posX, enemy.position.posY, enemy.speed);
+					if (enemy.position.posY >= 480.0f) { // 空中に浮いているシャチは水しぶきなし
+						SpawnEnemySlideParticle(enemy.position.posX, enemy.position.posY, enemy.speed);
+					}
 
 					// 画像の右端が完全に画面の左外側（scrollValue）を出たら、画面右外側へループ再出現
 					if (enemy.position.posX + enemy.size.posX < scrollValue) {
 						// オオカミが着地済みの場合はリスポーンさせない
-						if (jannpuLandingTimer > 0 || (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f)) {
+						if (selectedStage == 2 && (jannpuLandingTimer > 0 || (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f))) {
 							enemy.isActive = false;
 						}
 						else {
 							enemy.position.posX = scrollValue + 1280.0f + 200.0f;
-							enemy.position.posY = 480.0f;
-							enemy.hasTrampoline = (rand() % 2 == 0);
+							enemy.hasTrampoline = (selectedStage != 2 && rand() % 2 == 0); // ステージ3は常にトランポリン無し
+							SetEnemySpawnHeight(); // トランポリン付き＝地面 / 無し＝ランダムY（ステージ1・2）
 						}
 					}
 
@@ -2558,7 +2639,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 				//==========================================
 				// トランポリン判定
 				//==========================================
-				for (int i = 0; i < kTrampolineCount && !isGameClear; i++) {
+				for (int i = 0; i < kTrampolineCount && !isGameClear && selectedStage != 2; i++) { // ステージ3はトランポリン無し
 
 					float trampolineX =
 						trampolinePositions[i].posX;
@@ -2934,8 +3015,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// トランポリン描画
-				for (int i = 0; i < kTrampolineCount; i++) {
+				// トランポリン描画（ステージ3は描画しない）
+				for (int i = 0; i < kTrampolineCount && selectedStage != 2; i++) {
 
 					if (trampoline != -1) {
 						Novice::DrawSprite(
@@ -3113,12 +3194,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 								0.0f, WHITE
 							);
 
-							// te.png の当たり判定を赤い線で表示（判定処理と同じ位置・大きさ）
-							Novice::DrawBox(
-								static_cast<int>(waveHands[i].screenX + 40.0f + shakeOffsetX),
-								static_cast<int>(waveHands[i].screenY + 75.0f + shakeOffsetY),
-								160, 160, 0.0f, 0xFF0000FF, kFillModeWireFrame
-							);
 
 						}
 					}
@@ -3231,17 +3306,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// 狼の胴体（当たり判定）だけを赤い四角で表示
-				if (bossOokami.isActive) {
-					Novice::DrawBox(
-						static_cast<int>(kBossScreenX),
-						static_cast<int>(bossOokami.position.posY - kBossOffsetY), // ★ - kBossOffsetY を追加して上方向の判定位置を画像と統一
-						static_cast<int>(bossOokami.size.posX),
-						static_cast<int>(bossOokami.size.posY),
-						0.0f, 0xFF0000FF, kFillModeWireFrame
-					);
-				}
-
 				// ボスHPバー：ボスの位置から何回も回転しながら画面上部へ飛んで登場
 				if (bossOokami.isActive && jannpuPosY >= bossOokami.position.posY - kBossOffsetY - 120.0f) {
 					if (bossHPBarSpinTimer > 0 && bossHPBarSpinTimer < kBossHPBarSpinDuration) {
@@ -3285,9 +3349,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 							unsigned int hpColor = bossHP > 25 ? 0x45E05AFF : 0xFF4545FF;
 							drawHPRect(-barWidth * 0.5f + 4.0f, -9.0f, static_cast<float>(hpWidth), 18.0f, hpColor);
 						}
-					}
-					if (bossHPBarSpinTimer >= kBossHPBarSpinDuration) {
-						Novice::ScreenPrintf(520, 15, "BOSS HP %d / %d", bossHP, kBossMaxHP);
 					}
 				}
 
@@ -3345,13 +3406,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					if (meterWidth > 0) {
 						unsigned int meterColor = stage3ChargeCoinCount >= kCoinsToUnlockShot ? 0x35D9FFFF : 0xFFD447FF;
 						Novice::DrawBox(23, 91, meterWidth, 18, 0.0f, meterColor, kFillModeSolid);
-					}
-					Novice::ScreenPrintf(20, 116, "SHOT %d / %d", stage3ChargeCoinCount, kCoinsToUnlockShot);
-					if (stage3PowerBoostTimer > 0) {
-						Novice::ScreenPrintf(20, 140, "POWER x2! %.1f sec", stage3PowerBoostTimer / 60.0f);
-					}
-					if (stage3ChargeCoinCount >= kCoinsToUnlockShot) {
-						Novice::ScreenPrintf(20, 136, "AUTO SHOT!");
 					}
 				}
 
@@ -4155,16 +4209,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						particles[i].isActive = false;
 					}
 
-					// コイン雨の状態を初期化。星4つを獲得した場合のみ降らせる。
+					// コイン雨の状態を初期化。獲得したコイン枚数ぶんを星の演出後に降らせる。
 					memset(clearRainCoins, 0, sizeof(clearRainCoins));
 					memset(clearCoinPileHeights, 0, sizeof(clearCoinPileHeights));
 					clearCoinRainSpawned = 0;
 					clearCoinRainTarget = 0;
-					if (starCount == 4) {
-						clearCoinRainTarget = coinCount;
-						if (clearCoinRainTarget > kClearCoinRainMaxDrops) {
-							clearCoinRainTarget = kClearCoinRainMaxDrops;
-						}
+					clearCoinRainTarget = coinCount;
+					if (clearCoinRainTarget > kClearCoinRainMaxDrops) {
+						clearCoinRainTarget = kClearCoinRainMaxDrops;
 					}
 				}
 
@@ -4185,194 +4237,208 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				if (clearTexture != -1) {
-					Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
+				if (selectedStage == 2) {
+					// ★ ステージ3（ボス撃破）：gameClearWolf.png を全画面(1280x720)で1枚だけ表示
+					if (gameClearWolfTexture != -1) {
+						Novice::DrawSprite(0, 0, gameClearWolfTexture, 1.0f, 1.0f, 0.0f, WHITE);
+					}
+					else {
+						Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
+						Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+					}
 				}
 				else {
-					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
-					Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
-				}
+					if (clearTexture != -1) {
+						Novice::DrawSprite(0, 0, clearTexture, 1.0f, 1.0f, 0.0f, WHITE);
+					}
+					else {
+						Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x222033FF, kFillModeSolid);
+						Novice::ScreenPrintf(560, 100, "STAGE CLEAR!!");
+					}
 
-				// ★ ステージ3クリア時（ボス撃破時）に「勝った時のオオカミ画像」を表示
-				if (selectedStage == 2 && gameClearWolfTexture != -1) {
-					Novice::DrawSprite(
-						400, 180,               // 表示位置（画面中央付近）
-						gameClearWolfTexture,
-						1.0f, 1.0f, 0.0f, WHITE
-					);
-				}
+					// 星の演出が終わったあと、獲得したコイン枚数ぶんを上から降らせる。
+					if (clearCoinRainSpawned < clearCoinRainTarget &&
+						clearTimer >= kClearCoinRainStartFrame && clearTimer < kClearCoinRainEndFrame) {
+						int framesLeft = kClearCoinRainEndFrame - clearTimer;
+						if (framesLeft < 1) framesLeft = 1;
+						int coinsLeft = clearCoinRainTarget - clearCoinRainSpawned;
+						int spawnThisFrame = (coinsLeft + framesLeft - 1) / framesLeft;
 
-				// 星を4つ獲得した場合、PERFECT演出に合わせてコインを降らせる。
-				if (starCount == 4 && clearCoinRainSpawned < clearCoinRainTarget &&
-					clearTimer >= kClearCoinRainStartFrame && clearTimer < kClearCoinRainEndFrame) {
-					int framesLeft = kClearCoinRainEndFrame - clearTimer;
-					if (framesLeft < 1) framesLeft = 1;
-					int coinsLeft = clearCoinRainTarget - clearCoinRainSpawned;
-					int spawnThisFrame = (coinsLeft + framesLeft - 1) / framesLeft;
-
-					for (int spawn = 0; spawn < spawnThisFrame && clearCoinRainSpawned < clearCoinRainTarget; ++spawn) {
-						for (int i = 0; i < kMaxClearRainCoins; ++i) {
-							if (!clearRainCoins[i].isActive) {
-								clearRainCoins[i].position.posX = kClearCoinPileStartX +
-									static_cast<float>(rand() % static_cast<int>(kClearCoinColumnCount * kClearCoinColumnSpacing - kClearCoinDrawSize));
-								clearRainCoins[i].position.posY = -kClearCoinDrawSize - static_cast<float>(rand() % 180);
-								clearRainCoins[i].velocityY = 18.0f + static_cast<float>(rand() % 7);
-								clearRainCoins[i].isActive = true;
-								clearRainCoins[i].isSettled = false;
-								clearCoinRainSpawned++;
-								break;
+						for (int spawn = 0; spawn < spawnThisFrame && clearCoinRainSpawned < clearCoinRainTarget; ++spawn) {
+							for (int i = 0; i < kMaxClearRainCoins; ++i) {
+								if (!clearRainCoins[i].isActive) {
+									clearRainCoins[i].position.posX = kClearCoinPileStartX +
+										static_cast<float>(rand() % static_cast<int>(kClearCoinColumnCount * kClearCoinColumnSpacing - kClearCoinDrawSize));
+									clearRainCoins[i].position.posY = -kClearCoinDrawSize - static_cast<float>(rand() % 180);
+									clearRainCoins[i].velocityY = 18.0f + static_cast<float>(rand() % 7);
+									clearRainCoins[i].isActive = true;
+									clearRainCoins[i].isSettled = false;
+									clearCoinRainSpawned++;
+									break;
+								}
 							}
 						}
 					}
-				}
 
-				// 落下中のコインを更新し、画面下に積み重ねる。
-				for (int i = 0; i < kMaxClearRainCoins; ++i) {
-					ClearRainCoin& clearCoin = clearRainCoins[i];
-					if (!clearCoin.isActive) continue;
+					// 落下中のコインを更新し、画面下に積み重ねる。
+					for (int i = 0; i < kMaxClearRainCoins; ++i) {
+						ClearRainCoin& clearCoin = clearRainCoins[i];
+						if (!clearCoin.isActive) continue;
 
-					if (!clearCoin.isSettled) {
-						clearCoin.position.posY += clearCoin.velocityY;
-						clearCoin.velocityY += 0.18f;
+						if (!clearCoin.isSettled) {
+							clearCoin.position.posY += clearCoin.velocityY;
+							clearCoin.velocityY += 0.18f;
 
-						int column = static_cast<int>((clearCoin.position.posX - kClearCoinPileStartX + kClearCoinDrawSize * 0.5f) / kClearCoinColumnSpacing);
-						if (column < 0) column = 0;
-						if (column >= kClearCoinColumnCount) column = kClearCoinColumnCount - 1;
+							int column = static_cast<int>((clearCoin.position.posX - kClearCoinPileStartX + kClearCoinDrawSize * 0.5f) / kClearCoinColumnSpacing);
+							if (column < 0) column = 0;
+							if (column >= kClearCoinColumnCount) column = kClearCoinColumnCount - 1;
 
-						int stackHeight = clearCoinPileHeights[column];
-						float pileSurfaceY = kClearCoinPileBaseY - stackHeight * kClearCoinRowSpacing;
-						if (clearCoin.position.posY + kClearCoinDrawSize >= pileSurfaceY) {
-							if (stackHeight < kClearCoinMaxStackHeight) {
-								clearCoin.position.posX = kClearCoinPileStartX + column * kClearCoinColumnSpacing;
-								clearCoin.position.posY = pileSurfaceY - kClearCoinDrawSize;
-								clearCoinPileHeights[column]++;
-								clearCoin.isSettled = true;
-								clearCoin.velocityY = 0.0f;
-								clearCoin.position.posX += static_cast<float>((i % 3) - 1) * 2.0f;
-								clearCoin.position.posY += static_cast<float>(i % 2) * 2.0f;
+							int stackHeight = clearCoinPileHeights[column];
+							float pileSurfaceY = kClearCoinPileBaseY - stackHeight * kClearCoinRowSpacing;
+							if (clearCoin.position.posY + kClearCoinDrawSize >= pileSurfaceY) {
+								if (stackHeight < kClearCoinMaxStackHeight) {
+									clearCoin.position.posX = kClearCoinPileStartX + column * kClearCoinColumnSpacing;
+									clearCoin.position.posY = pileSurfaceY - kClearCoinDrawSize;
+									clearCoinPileHeights[column]++;
+									clearCoin.isSettled = true;
+									clearCoin.velocityY = 0.0f;
+									clearCoin.position.posX += static_cast<float>((i % 3) - 1) * 2.0f;
+									clearCoin.position.posY += static_cast<float>(i % 2) * 2.0f;
+								}
+								else {
+									// その列が上限に達した場合は消して、描画数と負荷を抑える。
+									clearCoin.isActive = false;
+								}
 							}
-							else {
-								// その列が上限に達した場合は消して、描画数と負荷を抑える。
-								clearCoin.isActive = false;
-							}
+							if (clearCoin.position.posY > 720.0f) clearCoin.isActive = false;
 						}
-						if (clearCoin.position.posY > 720.0f) clearCoin.isActive = false;
-					}
 
-					if (clearCoin.isActive && coin != -1) {
-						Novice::DrawSprite(static_cast<int>(clearCoin.position.posX), static_cast<int>(clearCoin.position.posY),
-							coin, kClearCoinDrawScale, kClearCoinDrawScale, 0.0f, WHITE);
-					}
-				}
-
-				DrawCoinEffects();
-				DrawCoinCount();
-
-				// 星が20フレームごとに1個ずつ飛び出す演出
-				const int kStarInterval = 20;
-				const int kStarSize = 180; // star.png / noStar.png の画像サイズ
-				const float kStarFinalScale = 0.9f;
-				for (int i = 0; i < 4; i++) {
-					int starElapsed = clearTimer - (i + 1) * kStarInterval;
-					if (starElapsed < 0) continue;
-
-					// ★ 条件を満たしている星の登場瞬間だけ効果音を鳴らす
-					if (starElapsed == 0 && starConditions[i]) {
-						if (starSound != -1) {
-							Novice::PlayAudio(starSound, false, 0.8f);
+						if (clearCoin.isActive) {
+							if (turnCoinTexture != -1) {
+								// turnCoin.png（64x64 x 4コマ）を回転アニメーションさせる。コインごとにコマをずらす。
+								int turnFrame = ((clearTimer / 3) + i) % 4;
+								Novice::DrawSpriteRect(
+									static_cast<int>(clearCoin.position.posX), static_cast<int>(clearCoin.position.posY),
+									turnFrame * 64, 0, 64, 64, turnCoinTexture,
+									kClearCoinDrawScale * 0.25f, kClearCoinDrawScale, 0.0f, WHITE);
+							}
+							else if (coin != -1) {
+								Novice::DrawSprite(static_cast<int>(clearCoin.position.posX), static_cast<int>(clearCoin.position.posY),
+									coin, kClearCoinDrawScale, kClearCoinDrawScale, 0.0f, WHITE);
+							}
 						}
 					}
 
-					int texture = starConditions[i] ? starTexture : noStarTexture;
-					if (texture == -1) continue;
+					DrawCoinEffects();
+					DrawCoinCount();
 
-					// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
-					float scale = kStarFinalScale;
-					if (starElapsed < 8) {
-						scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
-					}
-					else if (starElapsed < 16) {
-						scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
-					}
+					// 星が20フレームごとに1個ずつ飛び出す演出
+					const int kStarInterval = 20;
+					const int kStarSize = 180; // star.png / noStar.png の画像サイズ
+					const float kStarFinalScale = 0.9f;
+					for (int i = 0; i < 4; i++) {
+						int starElapsed = clearTimer - (i + 1) * kStarInterval;
+						if (starElapsed < 0) continue;
 
-					// 拡大・縮小しても星の中心位置が動かないようにする
-					int centerX = 325 + i * 210;
-					int centerY = 480;
-					int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
-					int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
-					Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
-
-					// 星の下に条件画像を表示
-					if (clearLabelTextures[i] != -1) {
-						Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
-							0.65f, 0.65f, 0.0f, WHITE);
-					}
-				}
-
-				// 獲得星数を数字画像で表示
-				if (clearTimer >= 4 * kStarInterval + 16) {
-					const float digitScale = 0.05f;
-					const float slashScale = 0.30f;
-					if (countTextures[starCount] != -1)
-						Novice::DrawSprite(595, 670, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
-					if (slashTexture != -1)
-						Novice::DrawSprite(615, 665, slashTexture, slashScale, slashScale, 0.0f, WHITE);
-					if (countTextures[4] != -1)
-						Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
-				}
-
-				// 4つの星をすべて獲得したときだけPERFECTと豪華な爆発パーティクルを表示
-				if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
-					int perfectElapsed = clearTimer - 110;
-					float perfectScale = 1.0f;
-					if (perfectElapsed < 10) {
-						perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
-						if (perfectElapsed == 0) {
+						// ★ 条件を満たしている星の登場瞬間だけ効果音を鳴らす
+						if (starElapsed == 0 && starConditions[i]) {
 							if (starSound != -1) {
-								Novice::PlayAudio(starSound, false, 1.0f);
+								Novice::PlayAudio(starSound, false, 0.8f);
 							}
-							// ★4つの星全部ゲット時のパーティクル発動
-							SpawnPerfectParticle(640.0f, 300.0f);
+						}
+
+						int texture = starConditions[i] ? starTexture : noStarTexture;
+						if (texture == -1) continue;
+
+						// 0～7フレーム: 大きく登場 / 8～15フレーム: 元の大きさに戻る
+						float scale = kStarFinalScale;
+						if (starElapsed < 8) {
+							scale = kStarFinalScale * (0.3f + 1.0f * starElapsed / 8.0f);
+						}
+						else if (starElapsed < 16) {
+							scale = kStarFinalScale * (1.3f - 0.3f * (starElapsed - 8) / 8.0f);
+						}
+
+						// 拡大・縮小しても星の中心位置が動かないようにする
+						int centerX = 325 + i * 210;
+						int centerY = 480;
+						int drawX = centerX - static_cast<int>(kStarSize * scale * 0.5f);
+						int drawY = centerY - static_cast<int>(kStarSize * scale * 0.5f);
+						Novice::DrawSprite(drawX, drawY, texture, scale, scale, 0.0f, WHITE);
+
+						// 星の下に条件画像を表示
+						if (clearLabelTextures[i] != -1) {
+							Novice::DrawSprite(centerX - 83, 565, clearLabelTextures[i],
+								0.65f, 0.65f, 0.0f, WHITE);
 						}
 					}
-					else if (perfectElapsed < 20) {
-						perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+
+					// 獲得星数を数字画像で表示
+					if (clearTimer >= 4 * kStarInterval + 16) {
+						const float digitScale = 0.05f;
+						const float slashScale = 0.30f;
+						if (countTextures[starCount] != -1)
+							Novice::DrawSprite(595, 670, countTextures[starCount], digitScale, digitScale, 0.0f, WHITE);
+						if (slashTexture != -1)
+							Novice::DrawSprite(615, 665, slashTexture, slashScale, slashScale, 0.0f, WHITE);
+						if (countTextures[4] != -1)
+							Novice::DrawSprite(675, 680, countTextures[4], digitScale, digitScale, 0.0f, WHITE);
 					}
 
-					// perfect.png は400x200。上部中央に表示
-					const int perfectWidth = 400;
-					const int perfectHeight = 200;
-					int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
-					int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
-					Novice::DrawSprite(perfectX, perfectY, perfectTexture,
-						perfectScale, perfectScale, 0.0f, WHITE);
-				}
+					// 4つの星をすべて獲得したときだけPERFECTと豪華な爆発パーティクルを表示
+					if (starCount == 4 && perfectTexture != -1 && clearTimer >= 110) {
+						int perfectElapsed = clearTimer - 110;
+						float perfectScale = 1.0f;
+						if (perfectElapsed < 10) {
+							perfectScale = 0.2f + 1.1f * perfectElapsed / 10.0f;
+							if (perfectElapsed == 0) {
+								if (starSound != -1) {
+									Novice::PlayAudio(starSound, false, 1.0f);
+								}
+								// ★4つの星全部ゲット時のパーティクル発動
+								SpawnPerfectParticle(640.0f, 300.0f);
+							}
+						}
+						else if (perfectElapsed < 20) {
+							perfectScale = 1.3f - 0.3f * (perfectElapsed - 10) / 10.0f;
+						}
 
-				// ★クリア画面専用のパーティクル描画処理
-				for (int i = 0; i < kMaxParticles; i++) {
-					if (particles[i].isActive) {
-						// 外側のキラキラ光枠
-						Novice::DrawEllipse(
-							(int)particles[i].position.posX,
-							(int)particles[i].position.posY,
-							(int)(particles[i].radius * 1.5f),
-							(int)(particles[i].radius * 1.5f),
-							0,
-							particles[i].color,
-							kFillModeSolid
-						);
-						// 内側の白いコア
-						Novice::DrawEllipse(
-							(int)particles[i].position.posX,
-							(int)particles[i].position.posY,
-							(int)particles[i].radius,
-							(int)particles[i].radius,
-							0,
-							WHITE,
-							kFillModeSolid
-						);
+						// perfect.png は400x200。上部中央に表示
+						const int perfectWidth = 400;
+						const int perfectHeight = 200;
+						int perfectX = 640 - static_cast<int>(perfectWidth * perfectScale / 2.0f);
+						int perfectY = 300 - static_cast<int>(perfectHeight * perfectScale / 2.0f);
+						Novice::DrawSprite(perfectX, perfectY, perfectTexture,
+							perfectScale, perfectScale, 0.0f, WHITE);
 					}
-				}
+
+					// ★クリア画面専用のパーティクル描画処理
+					for (int i = 0; i < kMaxParticles; i++) {
+						if (particles[i].isActive) {
+							// 外側のキラキラ光枠
+							Novice::DrawEllipse(
+								(int)particles[i].position.posX,
+								(int)particles[i].position.posY,
+								(int)(particles[i].radius * 1.5f),
+								(int)(particles[i].radius * 1.5f),
+								0,
+								particles[i].color,
+								kFillModeSolid
+							);
+							// 内側の白いコア
+							Novice::DrawEllipse(
+								(int)particles[i].position.posX,
+								(int)particles[i].position.posY,
+								(int)particles[i].radius,
+								(int)particles[i].radius,
+								0,
+								WHITE,
+								kFillModeSolid
+							);
+						}
+					}
+
+				} // ステージ1・2のクリア演出ここまで（ステージ3は画像1枚のみ）
 
 				if (clearTimer >= kClearShowFrames) {
 					scene = Title;
@@ -4410,6 +4476,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
 					bossDefeated = false;
+					slowMotionTimer = 0;
 					isEnemyBlownAway = false;
 					isPunching = false;
 					punchFrame = 0;
@@ -4449,6 +4516,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					  //==========================================
 			case GameOver: {
 				gameOverTimer++;
+				// ★プレイヤーが死んだらボスBGMを止める（ステージ3）
+				if (bossPlayHandle != -1) {
+					Novice::StopAudio(bossPlayHandle);
+					bossPlayHandle = -1;
+				}
 
 				// ★1フレーム目にゲームオーバーサウンドを再生（未再生時）
 				if (gameOverTimer == 1) {
@@ -4457,23 +4529,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					}
 				}
 
-				// 1. まず背景画像を描画（または黒背景）
-				if (gameOverTexture != -1) {
+				// ステージ3は gameOver.png を出さず、gameOverWolf.png（1280×720）を全画面で表示する
+				if (selectedStage == 2 && gameOverWolfTexture != -1) {
+					Novice::DrawSprite(0, 0, gameOverWolfTexture, 1.0f, 1.0f, 0.0f, WHITE);
+				}
+				// それ以外（ステージ1・2）は今までどおり gameOver.png（または黒背景）
+				else if (gameOverTexture != -1) {
 					Novice::DrawSprite(0, 0, gameOverTexture, 1.0f, 1.0f, 0.0f, WHITE);
 				}
 				else {
 					Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
 					Novice::ScreenPrintf(560, 360, "GAME OVER");
-				}
-
-				// 2. 背景の上に重なるように負けたオオカミの画像を描画（ステージ3限定）
-				if (selectedStage == 2 && gameOverWolfTexture != -1) {
-					// 画像のサイズや位置がズレないよう画面中央付近に配置
-					Novice::DrawSprite(
-						440, 200,               // 表示位置 (X, Y) を画面中央に微調整
-						gameOverWolfTexture,
-						1.0f, 1.0f, 0.0f, WHITE
-					);
 				}
 
 				// ==========================================
@@ -4524,7 +4590,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 
 					// 敵・ボーナス関連のリセット
 					enemy.position = { 1280.0f + 200.0f, 480.0f };
-					enemy.hasTrampoline = (rand() % 2 == 0);
+					enemy.hasTrampoline = (selectedStage != 2 && rand() % 2 == 0); // ステージ3は常にトランポリン無し
+					SetEnemySpawnHeight();
 					isSpeedBoostActive = false;
 					hasSpeedBoostTriggered = false;
 					speedBoostTimer = 0;
@@ -4556,6 +4623,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
 					bossDefeated = false;
+					slowMotionTimer = 0;
 					bossHP = kBossMaxHP;
 					bossHPBarSpinTimer = 0;
 					bossIsJumping = false;
@@ -4634,6 +4702,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					bossOokami.isActive = false;
 					bossSpawnTimer = 0;
 					bossDefeated = false;
+					slowMotionTimer = 0;
 					isEnemyBlownAway = false;
 					isPunching = false;
 					punchFrame = 0;
