@@ -47,6 +47,15 @@ struct Particle
 	unsigned int color = 0xFFFF00FF; // 初期色：黄色
 };
 
+// クリア画面で降らせるコイン専用データ（通常のパーティクルとは別管理）
+struct ClearRainCoin
+{
+	Vector2 position{};
+	float velocityY = 0.0f;
+	bool isActive = false;
+	bool isSettled = false;
+};
+
 //==========================================
 // クマ（突進敵）の設定
 //==========================================
@@ -634,6 +643,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 	//==========================================
 	const int kMaxParticles = 500;
 	Particle particles[kMaxParticles]{};
+
+
+	// クリア時のコイン雨・積み上げ演出
+	const int kMaxClearRainCoins = 380; // 同時表示数を制限して負荷を抑える
+	ClearRainCoin clearRainCoins[kMaxClearRainCoins]{};
+	const int kClearCoinColumnCount = 60;
+	const int kClearCoinMaxStackHeight = 6;
+	const float kClearCoinDrawScale = 0.25f;
+	const float kClearCoinDrawSize = 16.0f; // coin.png（64x64）の0.25倍
+	const float kClearCoinPileStartX = 40.0f;
+	const float kClearCoinColumnSpacing = 20.0f;
+	const float kClearCoinPileBaseY = 712.0f;
+	const float kClearCoinRowSpacing = 12.0f;
+	int clearCoinPileHeights[kClearCoinColumnCount]{};
+	int clearCoinRainTarget = 0;
+	int clearCoinRainSpawned = 0;
+	const int kClearCoinRainStartFrame = 110;
+	const int kClearCoinRainEndFrame = 370;
+	const int kClearCoinRainMaxDrops = 1000;
 
 	const int kParticleLifeTime = 40;
 
@@ -3732,7 +3760,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 									}
 								}
 								else if (bonusMap[y][x] == 2) {
-									hasTakenDamage = true;
+									// ダメージ電池はバッテリーを減らすが、ノーダメージ星の条件には影響させない
 									// ダメージ電池: バッテリー2個分減少
 									batteryFrame += 2;
 									if (batteryFrame >= kBatteryFrameCount - 1) {
@@ -4126,6 +4154,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 					for (int i = 0; i < kMaxParticles; i++) {
 						particles[i].isActive = false;
 					}
+
+					// コイン雨の状態を初期化。星4つを獲得した場合のみ降らせる。
+					memset(clearRainCoins, 0, sizeof(clearRainCoins));
+					memset(clearCoinPileHeights, 0, sizeof(clearCoinPileHeights));
+					clearCoinRainSpawned = 0;
+					clearCoinRainTarget = 0;
+					if (starCount == 4) {
+						clearCoinRainTarget = coinCount;
+						if (clearCoinRainTarget > kClearCoinRainMaxDrops) {
+							clearCoinRainTarget = kClearCoinRainMaxDrops;
+						}
+					}
 				}
 
 				// クリア画面の更新処理（パーティクルの移動・減速）
@@ -4161,6 +4201,70 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
 						1.0f, 1.0f, 0.0f, WHITE
 					);
 				}
+
+				// 星を4つ獲得した場合、PERFECT演出に合わせてコインを降らせる。
+				if (starCount == 4 && clearCoinRainSpawned < clearCoinRainTarget &&
+					clearTimer >= kClearCoinRainStartFrame && clearTimer < kClearCoinRainEndFrame) {
+					int framesLeft = kClearCoinRainEndFrame - clearTimer;
+					if (framesLeft < 1) framesLeft = 1;
+					int coinsLeft = clearCoinRainTarget - clearCoinRainSpawned;
+					int spawnThisFrame = (coinsLeft + framesLeft - 1) / framesLeft;
+
+					for (int spawn = 0; spawn < spawnThisFrame && clearCoinRainSpawned < clearCoinRainTarget; ++spawn) {
+						for (int i = 0; i < kMaxClearRainCoins; ++i) {
+							if (!clearRainCoins[i].isActive) {
+								clearRainCoins[i].position.posX = kClearCoinPileStartX +
+									static_cast<float>(rand() % static_cast<int>(kClearCoinColumnCount * kClearCoinColumnSpacing - kClearCoinDrawSize));
+								clearRainCoins[i].position.posY = -kClearCoinDrawSize - static_cast<float>(rand() % 180);
+								clearRainCoins[i].velocityY = 18.0f + static_cast<float>(rand() % 7);
+								clearRainCoins[i].isActive = true;
+								clearRainCoins[i].isSettled = false;
+								clearCoinRainSpawned++;
+								break;
+							}
+						}
+					}
+				}
+
+				// 落下中のコインを更新し、画面下に積み重ねる。
+				for (int i = 0; i < kMaxClearRainCoins; ++i) {
+					ClearRainCoin& clearCoin = clearRainCoins[i];
+					if (!clearCoin.isActive) continue;
+
+					if (!clearCoin.isSettled) {
+						clearCoin.position.posY += clearCoin.velocityY;
+						clearCoin.velocityY += 0.18f;
+
+						int column = static_cast<int>((clearCoin.position.posX - kClearCoinPileStartX + kClearCoinDrawSize * 0.5f) / kClearCoinColumnSpacing);
+						if (column < 0) column = 0;
+						if (column >= kClearCoinColumnCount) column = kClearCoinColumnCount - 1;
+
+						int stackHeight = clearCoinPileHeights[column];
+						float pileSurfaceY = kClearCoinPileBaseY - stackHeight * kClearCoinRowSpacing;
+						if (clearCoin.position.posY + kClearCoinDrawSize >= pileSurfaceY) {
+							if (stackHeight < kClearCoinMaxStackHeight) {
+								clearCoin.position.posX = kClearCoinPileStartX + column * kClearCoinColumnSpacing;
+								clearCoin.position.posY = pileSurfaceY - kClearCoinDrawSize;
+								clearCoinPileHeights[column]++;
+								clearCoin.isSettled = true;
+								clearCoin.velocityY = 0.0f;
+								clearCoin.position.posX += static_cast<float>((i % 3) - 1) * 2.0f;
+								clearCoin.position.posY += static_cast<float>(i % 2) * 2.0f;
+							}
+							else {
+								// その列が上限に達した場合は消して、描画数と負荷を抑える。
+								clearCoin.isActive = false;
+							}
+						}
+						if (clearCoin.position.posY > 720.0f) clearCoin.isActive = false;
+					}
+
+					if (clearCoin.isActive && coin != -1) {
+						Novice::DrawSprite(static_cast<int>(clearCoin.position.posX), static_cast<int>(clearCoin.position.posY),
+							coin, kClearCoinDrawScale, kClearCoinDrawScale, 0.0f, WHITE);
+					}
+				}
+
 				DrawCoinEffects();
 				DrawCoinCount();
 
